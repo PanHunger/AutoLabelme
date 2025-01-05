@@ -1,0 +1,10 @@
+cff-version: 1.0.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Pan"
+  given-names: "Zhiqun"
+  orcid: "https://orcid.org/0000-0003-3360-9499"
+title: "AUTO-Labelme: Automatic Image Polygonal Annotation with Python"
+doi: 10.5281/zenodo.5711226
+url: "https://github.com/PanHunger/auto-labelme"
+license: GPL-3

@@ -1,0 +1,17 @@
+names:
+  0: zebra
+  1: bowl
+  2: teddy bear
+  3: person
+  4: horse
+  5: vase
+  6: giraffe
+  7: umbrella
+  8: potted plant
+  9: elephant
+  10: broccoli
+  11: chair
+path: E:\PycharmProjects\yolov8_datasets\coco8
+test:
+train: images\1
+val: images\1

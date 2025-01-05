@@ -1,0 +1,16 @@
+path: E:/PycharmProjects/yolov8_datasets/coco8-seg # dataset root dir
+train: images/train # train images (relative to 'path') 4 images
+
+# Classes
+names:
+  0: person
+  1: bicycle
+  2: car
+  3: motorcycle
+  4: airplane
+  5: bus
+  6: train
+  7: truck
+  8: boat
+  9: traffic light
+  10: fire hydrant
