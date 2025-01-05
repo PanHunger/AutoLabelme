@@ -222,4 +222,4 @@ MPLBACKEND='agg' pytest -vsx tests/
 
 ## Acknowledgement
 
-This repo is the fork of [mpitid/pylabelme](https://github.com/mpitid/pylabelme).
+This repo is the fork of [wkentaro/labelme](https://github.com/wkentaro/labelme).
