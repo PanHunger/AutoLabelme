@@ -434,7 +434,20 @@ class TrainingInterface(QWidget):
         self.scale.setValue(10)
 
         params_layout.addWidget(self.scale, 5, 3)
-
+        
+        params_group.setLayout(params_layout)
+        main_layout.addWidget(params_group)
+        
+        # Labeling parameters
+        params_group = QGroupBox("标注参数")
+        params_layout = QGridLayout()
+        
+        self.generate_labels = QCheckBox("自动为剩余数据生成标注")
+        params_layout.addWidget(self.generate_labels, 1, 0)
+        
+        self.sam = QCheckBox("使用Segmentation模型优化标注")
+        params_layout.addWidget(self.sam, 1, 2)
+        
         params_group.setLayout(params_layout)
         main_layout.addWidget(params_group)
         

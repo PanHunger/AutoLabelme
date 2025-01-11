@@ -8,6 +8,7 @@ import libs.utils
 from libs import QT5
 from libs.logger import logger
 from libs.shape import Shape
+from PyQt5.QtGui import *
 
 # TODO(unknown):
 # - [maybe] Find optimal epsilon value.
@@ -100,6 +101,8 @@ class Canvas(QtWidgets.QWidget):
         # Set widget options.
         self.setMouseTracking(True)
         self.setFocusPolicy(QtCore.Qt.WheelFocus)
+        
+        self.verified = False
 
         self._ai_model = None
 
@@ -771,6 +774,15 @@ class Canvas(QtWidgets.QWidget):
             )
             drawing_shape.selected = True
             drawing_shape.paint(p)
+            
+        if self.verified:
+            pal = self.palette()
+            pal.setColor(self.backgroundRole(), QColor(184, 239, 38, 128))
+            self.setPalette(pal)
+        else:
+            pal = self.palette()
+            pal.setColor(self.backgroundRole(), QColor(232, 232, 232, 255))
+            self.setPalette(pal)
 
         p.end()
 

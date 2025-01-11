@@ -38,6 +38,7 @@ class LabelFile(object):
         self.shapes = []
         self.imagePath = None
         self.imageData = None
+        self.verified = False
         if filename is not None:
             self.load(filename)
         self.filename = filename
@@ -74,6 +75,7 @@ class LabelFile(object):
             "flags",  # image level flags
             "imageHeight",
             "imageWidth",
+            "verified"
         ]
         shape_keys = [
             "label",
@@ -133,6 +135,7 @@ class LabelFile(object):
         self.imageData = imageData
         self.filename = filename
         self.otherData = otherData
+        self.verified = data.get("verified")
 
     @staticmethod
     def _check_image_height_and_width(imageData, imageHeight, imageWidth):
@@ -150,6 +153,9 @@ class LabelFile(object):
             )
             imageWidth = img_arr.shape[1]
         return imageHeight, imageWidth
+    
+    def toggleVerify(self):
+        self.verified = not self.verified
 
     def save(
         self,
@@ -158,6 +164,7 @@ class LabelFile(object):
         imagePath,
         imageHeight,
         imageWidth,
+        verified=False,
         imageData=None,
         otherData=None,
         flags=None,
@@ -179,6 +186,7 @@ class LabelFile(object):
             imageData=imageData,
             imageHeight=imageHeight,
             imageWidth=imageWidth,
+            verified=verified,
         )
         for key, value in otherData.items():
             assert key not in data

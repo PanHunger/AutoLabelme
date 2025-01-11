@@ -368,8 +368,9 @@ class MainWindow(QtWidgets.QMainWindow):
         
         # 训练模型 action：
         # 选择任务、选择模型、选择数据集 yaml 文件、设置训练集\验证集比例、设置 batch_size、是否从头训练
-        train_with_labels = action('train_with_labels', self.train_with_labels, 'Alt+F1', 'train_with_labels')
-        analyse_result = action('analyse_result', self.analyse_result, 'Alt+F2', 'analyse_result')
+        train_with_labels = action('train_with_labels', self.train_with_labels, 'Alt+F1', 'train model with already labeled data')
+        analyse_result = action('analyse_result', self.analyse_result, 'Alt+F2', 'analyse training result')
+        delete_unchecked = action('delete_unchecked', self.delete_unchecked, 'Alt+F1', 'delect all unchecked labels')
         
         # 自动标注 action：
         search_system = action('Search_System', self.search_actions_info, None, 'zoom-in')
@@ -422,6 +423,13 @@ class MainWindow(QtWidgets.QMainWindow):
             self.tr("Open next (hold Ctl+Shift to copy labels)"),
             enabled=False,
         )
+        verify = action(
+            self.tr("&Verify"), 
+            self.verifyImg,
+            shortcuts["verify"], 
+            'verify', 
+            self.tr('verifyImgDetail')
+            )
         openPrevImg = action(
             self.tr("&Prev Image"),
             self.openPrevImg,
@@ -842,6 +850,7 @@ class MainWindow(QtWidgets.QMainWindow):
             brightnessContrast=brightnessContrast,
             zoomActions=zoomActions,
             openNextImg=openNextImg,
+            verify=verify,
             openPrevImg=openPrevImg,
             fileMenuActions=(open_, opendir, save, saveAs, close, quit),
             tool=(),
@@ -914,7 +923,8 @@ class MainWindow(QtWidgets.QMainWindow):
         utils.addActions(self.menus.training,
             (
                train_with_labels,
-               analyse_result        
+               analyse_result,
+               delete_unchecked  
             )
         )
         utils.addActions(self.menus.annotate,
@@ -945,6 +955,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 open_,
                 openNextImg,
                 openPrevImg,
+                verify,
                 opendir,
                 self.menus.recentFiles,
                 save,
@@ -1038,6 +1049,7 @@ class MainWindow(QtWidgets.QMainWindow):
             opendir,
             openPrevImg,
             openNextImg,
+            verify,
             save,
             deleteFile,
             None,
@@ -1645,6 +1657,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def saveLabels(self, filename):
         lf = LabelFile()
+        self.labelFile.verified = self.canvas.verified
 
         def format_shape(s):
             data = s.other_data.copy()
@@ -1682,6 +1695,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 imageData=imageData,
                 imageHeight=self.image.height(),
                 imageWidth=self.image.width(),
+                verified=self.labelFile.verified,
                 otherData=self.otherData,
                 flags=flags,
             )
@@ -1914,11 +1928,13 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.labelFile.imagePath,
             )
             self.otherData = self.labelFile.otherData
+            self.canvas.verified = self.labelFile.verified
         else:
             self.imageData = LabelFile.load_image_file(filename)
             if self.imageData:
                 self.imagePath = filename
             self.labelFile = None
+            self.canvas.verified = False
         image = QtGui.QImage.fromData(self.imageData)
 
         if image.isNull():
@@ -2099,6 +2115,27 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.loadFile(filename)
 
         self._config["keep_prev"] = keep_prev
+        
+    def verifyImg(self, _value=False):
+              
+        # Proceding next image without dialog if having any label
+        if self.filePath is not None:
+            try:
+                self.labelFile.toggleVerify()
+            except AttributeError:
+                # If the labelling file does not exist yet, create if and
+                # re-save it with the verified attribute.
+                self.saveFile()
+                if self.labelFile != None:
+                    self.labelFile.toggleVerify()
+                else:
+                    return
+
+            self.canvas.verified = self.labelFile.verified
+            self.paintCanvas()
+            self.actions.save.setEnabled(True)
+            self.setDirty()
+            # self.saveFile()
 
     def openNextImg(self, _value=False, load=True):
         keep_prev = self._config["keep_prev"]
@@ -2487,6 +2524,9 @@ class MainWindow(QtWidgets.QMainWindow):
         print("子窗口引用已清理")
     
     def analyse_result(self):
+        pass
+
+    def delete_unchecked(self):
         pass
 
     def search_actions_info(self):
@@ -2905,7 +2945,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 info += '{}:  {}\n'.format(key, result[key])
             QMessageBox.information(self, u'Info', info)
 
-            DataViewer(result, self).show()
+            # DataViewer(result, self).show()
             # 创建直方图
             classes, pic_nums, box_nums = zip(*[(key, val[0], val[1]) for key, val in result.items() if key != 'total'])
             self.plot_histogram_vertical(classes, box_nums)
@@ -3362,7 +3402,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 # "imageData": image_to_base64(image_path),
                 "imageData": None,
                 "imageHeight": image_height,
-                "imageWidth": image_width
+                "imageWidth": image_width,
+                "verified": False
             }
 
             for i, mask in enumerate(segmentation_masks):
