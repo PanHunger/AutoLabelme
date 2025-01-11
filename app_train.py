@@ -301,11 +301,13 @@ class TrainingInterface(QWidget):
         self.annotation_path = QLineEdit(annotation_path)
         self.pretrained_path = QLineEdit(pretrained_path)
         self.train_thread = None
+        self.weights_path = None
+        self.cfg_path = None
         self.init_ui()
 
     def init_ui(self):
         self.setWindowTitle("Train with Labels")
-        self.resize(1200, 930)
+        self.resize(1200, 980)
         # Main Layout
         main_layout = QVBoxLayout()
         
@@ -443,7 +445,12 @@ class TrainingInterface(QWidget):
         params_layout = QGridLayout()
         
         self.generate_labels = QCheckBox("自动为剩余数据生成标注")
+        self.generate_labels.setChecked(True)
         params_layout.addWidget(self.generate_labels, 1, 0)
+        
+        self.generate_labels = QCheckBox("只使用Verified标注数据")
+        self.generate_labels.setChecked(True)
+        params_layout.addWidget(self.generate_labels, 1, 1)
         
         self.sam = QCheckBox("使用Segmentation模型优化标注")
         params_layout.addWidget(self.sam, 1, 2)
@@ -617,6 +624,9 @@ class TrainingInterface(QWidget):
             "image_path": self.img_path.text(),
             "val": self.val.isChecked()
         }
+        
+        self.weights_path = os.path.join(base_path, folder_name, "weights")
+        self.cfg_path = os.path.join("./cfgs", f"{os.path.basename(base_path)}.yaml")
 
         # 启动训练线程
         self.train_thread = TrainThread(params, self.train_button)

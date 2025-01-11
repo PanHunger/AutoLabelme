@@ -36,6 +36,8 @@ import json
 import base64
 from PIL import Image
 from io import BytesIO
+from shapely.geometry import Polygon
+
 
 def newIcon(icon):
     return QIcon(':/' + icon)
@@ -2516,12 +2518,20 @@ class MainWindow(QtWidgets.QMainWindow):
             self.training_window.show()
             # 连接子窗口关闭信号到回调函数
             self.training_window.destroyed.connect(self.cleanup_training_window)
+         
 
     def cleanup_training_window(self):
+        weight_path = self.training_window.weights_path
+        cfg_path = self.training_window.cfg_path
         """子窗口销毁时清理引用"""
         print("清理子窗口引用...")
         self.training_window = None  # 删除对 TrainingInterface 的引用
         print("子窗口引用已清理")
+        self.yolo_auto_labeling(
+            weight_path=weight_path,
+            # cfg_path=cfg_path
+            )
+        
     
     def analyse_result(self):
         pass
@@ -3306,16 +3316,25 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception as e:
             QMessageBox.information(self, u'Sorry!', u'something is wrong. ({})'.format(e))
      
-    def yolo_auto_labeling(self):        
-        weight_path='yolo_weights'
+    def yolo_auto_labeling(self, weight_path=None, cfg_path='cfgs'):
+        
+        if weight_path == None:
+            weight_path = QFileDialog.getExistingDirectory(self, "Choose 'yolo_weights' folder:", 'yolo_weights', QFileDialog.ShowDirsOnly)
+            if weight_path == '':
+                return
+        
         weight_list=[]
         for item in sorted(os.listdir(weight_path)):
             if item.endswith('.h5') or item.endswith('.pt') or item.endswith('.pth'):
                 weight_list.append(item)
+        if len(weight_list) == 0:
+            QMessageBox.information(self, u'Wrong!', u'have no weight file in this folder, please check again.')
+            return
         items = tuple(weight_list)
         if len(weight_list) > 0 :
             weights, ok = QInputDialog.getItem(self, "Select",
-            "Model weights file(weights file should under 'yolo_weights'):", items, 0, False)
+            f"Model weights file(under {weight_path}):", 
+            items, 0, False)
             if not ok:
                 return
             else:
@@ -3336,16 +3355,17 @@ class MainWindow(QtWidgets.QMainWindow):
         model = YOLO(weights)
         task = model.task
         model.to(device)
-                
-        cfg_path = 'cfgs'
+
         cfg_list = []
         for item in sorted(os.listdir(cfg_path)):
             if item.endswith('.yaml'):
                 cfg_list.append(item)
         items = tuple(cfg_list)
         if len(cfg_list) > 0 :
-            cfgs, ok = QInputDialog.getItem(self, "Select",
-            "Configure file(Configure file should under 'cfgs' folder):", items, 0, False)
+            cfgs, ok = QInputDialog.getItem(self, 
+                                            "Select", 
+                                            "Configure file(Configure file should under 'cfgs' folder):", 
+                                            items, 0, False)
             if not ok:
                 return
             else:
@@ -3374,11 +3394,23 @@ class MainWindow(QtWidgets.QMainWindow):
                 print("Selected labels:", needed_labels)
             else:
                 print("Dialog cancelled")
+                
+        items = tuple(["Yes", "No"])
+        yes_or_no, ok = QInputDialog.getItem(self, 
+                                             "Select",
+                                             'Whether use Simplify to rarefy polygon?', 
+                                             items, 0, False)
+        if not ok:
+            return
+        else:
+            yes_or_no = True if yes_or_no == "Yes" else False
         
         # set imsize
-        # imgsz, OK = QInputDialog.getInt(self, 'Integer input dialog', 'input img size(k*32):', value=640)
-        # if not OK:
-        #     return
+        if yes_or_no:
+            tolerance, OK = QInputDialog.getInt(self, 'Simplify Setting', 'tolerance value (default=0.5):', value=5)
+            if not OK:
+                return
+        
         imgsz = 640
         
         # 函数：将图像转换为Base64编码
@@ -3412,15 +3444,15 @@ class MainWindow(QtWidgets.QMainWindow):
                 # 将分割掩码坐标转换为多边形的坐标
                 points = np.array(mask).reshape(-1, 2).tolist()
                 
-                from shapely.geometry import Polygon
-                # 创建一个Shapely多边形对象
-                polygon = Polygon(points)
+                if yes_or_no:
+                    # 创建一个Shapely多边形对象
+                    polygon = Polygon(points)
 
-                # 使用simplify方法简化多边形，指定容忍度（误差阈值）
-                simplified_polygon = polygon.simplify(5.0, preserve_topology=True)
+                    # 使用simplify方法简化多边形，指定容忍度（误差阈值）
+                    simplified_polygon = polygon.simplify(tolerance=tolerance, preserve_topology=True)
 
-                # 获取简化后的点集
-                simplified_points = list(simplified_polygon.exterior.coords)
+                    # 获取简化后的点集
+                    points = list(simplified_polygon.exterior.coords)
 
                 # 根据需求判断是矩形还是多边形
                 shape_type = "polygon" if task == 'segment' else "rectangle"
@@ -3428,7 +3460,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 # 添加标注信息
                 labelme_data["shapes"].append({
                     "label": label,
-                    "points": simplified_points,
+                    "points": points,
                     "group_id": None,
                     "description": "",
                     "shape_type": shape_type,
@@ -3457,6 +3489,13 @@ class MainWindow(QtWidgets.QMainWindow):
         _ = model(img.half() if half else img) if device.type != 'cpu' else None  # run once
         index = -1
         for path, img, im0s, vid_cap in dataset:
+            json_path = path.split('.')[0] + ".json"
+            if os.path.exists(json_path):
+                with open(json_path, "r") as f:
+                    data = json.load(f)
+                    verified = data.get("verified")
+                    if verified:
+                        continue    
             index += 1
             progress.setValue(int(100 * index / len(dataset)))
             if progress.wasCanceled():

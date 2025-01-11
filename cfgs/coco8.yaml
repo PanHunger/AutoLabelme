@@ -1,16 +1,16 @@
 names:
-  0: zebra
-  1: bowl
-  2: teddy bear
-  3: person
-  4: horse
-  5: vase
-  6: giraffe
-  7: umbrella
-  8: potted plant
+  0: potted plant
+  1: vase
+  2: giraffe
+  3: broccoli
+  4: zebra
+  5: umbrella
+  6: horse
+  7: bowl
+  8: person
   9: elephant
-  10: broccoli
-  11: chair
+  10: dog
+  11: teddy bear
 path: E:\PycharmProjects\yolov8_datasets\coco8
 test:
 train: images\1
