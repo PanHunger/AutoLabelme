@@ -7,6 +7,8 @@ import yaml
 import os
 import shutil
 import random
+import easygui 
+
 from PyQt5.QtWidgets import (
     QApplication,
     QWidget,
@@ -36,8 +38,68 @@ from glob import glob
 from tqdm import tqdm
 import numpy as np
 
+from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QColor, QPalette
 
+class MultiChoiceDialog(QDialog):
+    def __init__(self, msg, title, choices, parent=None):
+        super(MultiChoiceDialog, self).__init__(parent)
+        
+        self.resize(400, 600)
+        self.setWindowTitle(title)
+
+        # 创建布局和组件
+        self.layout = QVBoxLayout(self)
+
+        self.label = QLabel(msg)
+        self.layout.addWidget(self.label)
+
+        self.listWidget = QListWidget()
+        for choice in choices:
+            item = QListWidgetItem(choice)
+            item.setCheckState(Qt.Unchecked)  # 初始化所有选项为未选中
+            self.listWidget.addItem(item)
+        self.layout.addWidget(self.listWidget)
+
+        # 创建按钮区域
+        self.buttonWidget = QWidget()
+        self.buttonLayout = QHBoxLayout(self.buttonWidget)
+
+        self.selectAllButton = QPushButton("select all")
+        self.selectAllButton.clicked.connect(self.select_all)
+        self.buttonLayout.addWidget(self.selectAllButton)
+
+        self.clearAllButton = QPushButton("clear all")
+        self.clearAllButton.clicked.connect(self.clear_all)
+        self.buttonLayout.addWidget(self.clearAllButton)
+
+        # 将按钮区域添加到主布局中
+        self.layout.addWidget(self.buttonWidget)
+
+        self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+        self.layout.addWidget(self.buttonBox)
+
+        self.setLayout(self.layout)
+
+    def select_all(self):
+        for index in range(self.listWidget.count()):
+            item = self.listWidget.item(index)
+            item.setCheckState(Qt.Checked)
+
+    def clear_all(self):
+        for index in range(self.listWidget.count()):
+            item = self.listWidget.item(index)
+            item.setCheckState(Qt.Unchecked)
+
+    def selected_choices(self):
+        selected = []
+        for index in range(self.listWidget.count()):
+            item = self.listWidget.item(index)
+            if item.checkState() == Qt.Checked:
+                selected.append(item.text())
+        return selected
 
 
 def set_dark_theme(app):
@@ -452,7 +514,7 @@ class TrainingInterface(QWidget):
         self.generate_labels.setChecked(True)
         params_layout.addWidget(self.generate_labels, 1, 1)
         
-        self.sam = QCheckBox("使用Segmentation模型优化标注")
+        self.sam = QCheckBox("使用Segmentation模型优化标注 (仅在目标较大时使用)")
         params_layout.addWidget(self.sam, 1, 2)
         
         params_group.setLayout(params_layout)
@@ -552,6 +614,7 @@ class TrainingInterface(QWidget):
         self.log_text.append(message)
 
     def start_training(self):
+               
         """启动训练任务"""
         if self.annotation_path.text() == "" or self.img_path.text() == "":
             return QMessageBox.critical(self, "错误", "请填写标注文件夹路径和图片文件夹路径！")
@@ -920,6 +983,15 @@ class TrainThread(QThread):
             self.log_signal.emit("加载数据...")
             # 获取所有标签
             unique_labels, labels_dict = self.find_unique_labels_in_directory(self.params['annotation_path'])
+            
+            needed_labels = None
+            while needed_labels is None:
+                # 提取 names 部分的内容并放入字典中   
+                needed_labels = easygui.multchoicebox(msg="select labels you want auto-labeing?",title="Setect labels",choices=tuple(unique_labels,))               
+                
+                if needed_labels == None:
+                    self.log_signal.emit("重新选择标签...")
+            
             # 将 json 文件转换为 txt 文件
             self.convert_json2txt(anno_dir=os.path.dirname(self.params['annotation_path']), 
                                   image_dir=os.path.dirname(self.params['image_path']), 

@@ -66,7 +66,7 @@ from libs.widgets import ZoomWidget
 from libs import utils
 from libs.utils.datasets import *
 from libs.utils import torch_utils
-from app_train import TrainingInterface, set_dark_theme, apply_stylesheet
+from app_train import TrainingInterface, set_dark_theme, apply_stylesheet, MultiChoiceDialog
 
 # FIXME
 # - [medium] Set max zoom value to something big enough for FitWidth/Window
@@ -91,68 +91,7 @@ def ustr(x):
         return x
     else:
         return x
-    
-    
-class MultiChoiceDialog(QDialog):
-    def __init__(self, msg, title, choices, parent=None):
-        super(MultiChoiceDialog, self).__init__(parent)
-        
-        self.resize(400, 600)
-        self.setWindowTitle(title)
-
-        # 创建布局和组件
-        self.layout = QVBoxLayout(self)
-
-        self.label = QLabel(msg)
-        self.layout.addWidget(self.label)
-
-        self.listWidget = QListWidget()
-        for choice in choices:
-            item = QListWidgetItem(choice)
-            item.setCheckState(Qt.Unchecked)  # 初始化所有选项为未选中
-            self.listWidget.addItem(item)
-        self.layout.addWidget(self.listWidget)
-
-        # 创建按钮区域
-        self.buttonWidget = QWidget()
-        self.buttonLayout = QHBoxLayout(self.buttonWidget)
-
-        self.selectAllButton = QPushButton("select all")
-        self.selectAllButton.clicked.connect(self.select_all)
-        self.buttonLayout.addWidget(self.selectAllButton)
-
-        self.clearAllButton = QPushButton("clear all")
-        self.clearAllButton.clicked.connect(self.clear_all)
-        self.buttonLayout.addWidget(self.clearAllButton)
-
-        # 将按钮区域添加到主布局中
-        self.layout.addWidget(self.buttonWidget)
-
-        self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        self.buttonBox.accepted.connect(self.accept)
-        self.buttonBox.rejected.connect(self.reject)
-        self.layout.addWidget(self.buttonBox)
-
-        self.setLayout(self.layout)
-
-    def select_all(self):
-        for index in range(self.listWidget.count()):
-            item = self.listWidget.item(index)
-            item.setCheckState(Qt.Checked)
-
-    def clear_all(self):
-        for index in range(self.listWidget.count()):
-            item = self.listWidget.item(index)
-            item.setCheckState(Qt.Unchecked)
-
-    def selected_choices(self):
-        selected = []
-        for index in range(self.listWidget.count()):
-            item = self.listWidget.item(index)
-            if item.checkState() == Qt.Checked:
-                selected.append(item.text())
-        return selected
-    
+       
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
     
@@ -2537,7 +2476,28 @@ class MainWindow(QtWidgets.QMainWindow):
         pass
 
     def delete_unchecked(self):
-        pass
+        # 提醒是否真的要删除没有verified的json文件
+        reply = QMessageBox.question(self, 'Message', 'Are you sure to delete all unchecked json files?', QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            json_root = self.defaultSaveDir
+            removed_json = []
+            if json_root == None:
+                QMessageBox.information(self, u'Wrong!', u'have no loaded folder yet, please check again.')
+                return
+            for path in natsort.natsorted(os.listdir(json_root)):
+                if path.split('.')[-1] == 'json':
+                    json_path = osp.join(json_root, path)
+                    with open(json_path, "r") as f:
+                        data = json.load(f)
+                        verified = data.get("verified")
+                        if not verified:
+                            removed_json.append(json_path)
+            for json_path in removed_json:
+                os.remove(json_path)
+            QMessageBox.information(self, 'Message', 'All unchecked json files have been deleted.')
+        else:
+            pass
+
 
     def search_actions_info(self):
         """this is a action information search system.
@@ -3394,7 +3354,13 @@ class MainWindow(QtWidgets.QMainWindow):
                 print("Selected labels:", needed_labels)
             else:
                 print("Dialog cancelled")
-                
+                return
+        
+        # 询问是否使用Simplify来稀疏多边形
+        # 没有取消选项，只有是和否
+        # reply = QMessageBox.question(self, 'Message', 'Whether use Simplify to rarefy polygon?', QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        # yes_or_no = True if reply == QMessageBox.Yes else False
+        # 如果选择了是，则询问容差值
         items = tuple(["Yes", "No"])
         yes_or_no, ok = QInputDialog.getItem(self, 
                                              "Select",
@@ -3425,7 +3391,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return img_str
         
         # 函数：生成 LabelMe 格式的 JSON
-        def generate_labelme_json(image_path, segmentation_masks, cls, names, image_height, image_width):
+        def generate_labelme_json(image_path, segmentation_masks, cls, names, image_height, image_width, needed_labels):
             labelme_data = {
                 "version": "5.5.0",
                 "flags": {},
@@ -3440,6 +3406,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
             for i, mask in enumerate(segmentation_masks):
                 label = names[cls[i]]
+                if label not in needed_labels:
+                    continue
                 
                 # 将分割掩码坐标转换为多边形的坐标
                 points = np.array(mask).reshape(-1, 2).tolist()
@@ -3488,6 +3456,8 @@ class MainWindow(QtWidgets.QMainWindow):
         img = torch.zeros((1, 3, imgsz, imgsz), device=device)  # init img
         _ = model(img.half() if half else img) if device.type != 'cpu' else None  # run once
         index = -1
+        need_label_image_num = 0
+        success_index = 0
         for path, img, im0s, vid_cap in dataset:
             json_path = path.split('.')[0] + ".json"
             if os.path.exists(json_path):
@@ -3512,6 +3482,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 pass
             elif task == "detect":
                 try:
+                    if result[0].boxes is None:
+                        continue
                     data = result[0].boxes.xyxy
                 except Exception as e:
                     QMessageBox.information(self, u'Sorry!', u'something is wrong. ({})'.format(e))
@@ -3519,6 +3491,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 pass
             elif task == "segment":
                 try:
+                    if result[0].masks is None:
+                        continue
                     data = result[0].masks.xy
                 except Exception as e:
                     QMessageBox.information(self, u'Sorry!', u'something is wrong. ({})'.format(e))           
@@ -3527,17 +3501,18 @@ class MainWindow(QtWidgets.QMainWindow):
                 
             height, width, _ = im0s.shape
             # 生成 LabelMe 格式的标注数据
-            labelme_json = generate_labelme_json(path, data, cls, names, height, width)
+            labelme_json = generate_labelme_json(path, data, cls, names, height, width, needed_labels)
 
             # 将结果保存为JSON文件
             json_path = path.split('.')[0] + ".json"
             with open(json_path, 'w') as f:
                 json.dump(labelme_json, f, indent=4)
 
+            success_index += 1
             print(f"LabelMe格式的标注已生成并保存为 {json_path}")
                 
         progress.setValue(100)
-        QMessageBox.information(self, u'Done!', u'auto labeling done, please reload img folder')
+        QMessageBox.information(self, u'Done!', f'auto labeling done. {success_index}/{index+1} images have got auto labels. \nplease reload img folder')
             
                     
     def auto_labeling(self):
