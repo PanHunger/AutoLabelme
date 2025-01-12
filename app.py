@@ -325,6 +325,7 @@ class MainWindow(QtWidgets.QMainWindow):
         fix_property = action('fix_property', self.fix_xml_property, 'Ctrl+5', 'color_line')
         auto_labeling = action('auto_labeling', self.auto_labeling, 'Ctrl+6', 'new')
         data_augment = action('data_augment', self.data_auto_augment, 'Ctrl+7', 'copy')
+        sam_optim = action('sam_optim', self.sam_optim, 'Ctrl+8', 'sam')
         folder_info = action('folder_info', self.show_folder_infor, 'Alt+1', 'help')
         label_info = action('label_info', self.show_label_info, 'Alt+2', 'help')
         
@@ -876,7 +877,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 None,
                 label_pruning, file_pruning, change_label, fix_property,
                 None,
-                auto_labeling, data_augment,
+                auto_labeling, data_augment, sam_optim,
                 None,
                 folder_info, label_info
             )
@@ -2531,6 +2532,7 @@ class MainWindow(QtWidgets.QMainWindow):
                      'fix_property':self.fix_xml_property,      'c5':self.fix_xml_property,
                      'auto_labeling':self.auto_labeling,        'c6':self.auto_labeling,
                      'data_augment':self.data_auto_augment,     'c7':self.data_auto_augment,
+                     'sam_optim':self.sam_optim,                'c8':self.sam_optim,
                      'folder_info':self.show_folder_infor,      'a1':self.show_folder_infor,
                      'label_info':self.show_label_info,         'a2':self.show_label_info,
                      'extract_video':self.extract_video,        's1':self.extract_video,
@@ -3587,6 +3589,9 @@ class MainWindow(QtWidgets.QMainWindow):
             
         except Exception as e:
             QMessageBox.information(self, u'Sorry!', u'something is wrong. ({})'.format(e))
+    
+    def sam_optim(self):
+        pass
     
     def augment_A(self, imglist, xmllist, progress):
         print('agmt:', len(imglist))
