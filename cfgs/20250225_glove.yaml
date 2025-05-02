@@ -1,0 +1,6 @@
+names:
+  0: heidian
+path: E:\PycharmProjects\yolov8_datasets\ChuangDian\20250225_glove
+test:
+train: images\front
+val: images\front

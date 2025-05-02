@@ -1599,7 +1599,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def saveLabels(self, filename):
         lf = LabelFile()
-        self.labelFile.verified = self.canvas.verified
+        verified_temp = self.canvas.verified
 
         def format_shape(s):
             data = s.other_data.copy()
@@ -1637,7 +1637,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 imageData=imageData,
                 imageHeight=self.image.height(),
                 imageWidth=self.image.width(),
-                verified=self.labelFile.verified,
+                verified=verified_temp,
                 otherData=self.otherData,
                 flags=flags,
             )

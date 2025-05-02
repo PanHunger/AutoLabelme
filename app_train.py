@@ -984,13 +984,19 @@ class TrainThread(QThread):
             # 获取所有标签
             unique_labels, labels_dict = self.find_unique_labels_in_directory(self.params['annotation_path'])
             
-            needed_labels = None
-            while needed_labels is None:
-                # 提取 names 部分的内容并放入字典中   
-                needed_labels = easygui.multchoicebox(msg="select labels you want auto-labeing?",title="Setect labels",choices=tuple(unique_labels,))               
-                
-                if needed_labels == None:
-                    self.log_signal.emit("重新选择标签...")
+            print(unique_labels)
+            print(labels_dict)
+            
+            if len(unique_labels) > 1:
+                needed_labels = None
+                while needed_labels is None:
+                    # 提取 names 部分的内容并放入字典中   
+                    needed_labels = easygui.multchoicebox(msg="select labels you want auto-labeing?",title="Setect labels",choices=tuple(unique_labels,))               
+                    
+                    if needed_labels == None:
+                        self.log_signal.emit("重新选择标签...")
+            else:
+                self.log_signal.emit("此数据集中仅有<1>个标签！不需要选择标签！")
             
             # 将 json 文件转换为 txt 文件
             self.convert_json2txt(anno_dir=os.path.dirname(self.params['annotation_path']), 
