@@ -3358,7 +3358,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 print("Dialog cancelled")
                 return
         
-        # 询问是否使用Simplify来稀疏多边形
+        # 询问是否使用 Simplify 来稀疏多边形
         # 没有取消选项，只有是和否
         # reply = QMessageBox.question(self, 'Message', 'Whether use Simplify to rarefy polygon?', QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         # yes_or_no = True if reply == QMessageBox.Yes else False
