@@ -3318,6 +3318,11 @@ class MainWindow(QtWidgets.QMainWindow):
         task = model.task
         model.to(device)
 
+        if cfg_path == 'cfgs':
+            cfg_path = QFileDialog.getExistingDirectory(self, "Choose 'dataset configure' folder:", '', QFileDialog.ShowDirsOnly)
+            if cfg_path == '':
+                return
+
         cfg_list = []
         for item in sorted(os.listdir(cfg_path)):
             if item.endswith('.yaml'):
@@ -3326,7 +3331,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if len(cfg_list) > 0 :
             cfgs, ok = QInputDialog.getItem(self, 
                                             "Select", 
-                                            "Configure file(Configure file should under 'cfgs' folder):", 
+                                            "Configure file:", 
                                             items, 0, False)
             if not ok:
                 return
@@ -3339,7 +3344,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 return
 
         # 读取 YAML 文件
-        with open(cfgs, 'r') as file:
+        with open(cfgs, 'r', encoding='utf-8') as file:
             data = yaml.safe_load(file)
             
         # 提取 names 部分的内容并放入字典中
