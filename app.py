@@ -372,6 +372,15 @@ class MainWindow(QtWidgets.QMainWindow):
             'verify', 
             self.tr('verifyImgDetail')
             )
+        
+        autoLabeling = action(
+            "&AUTO",
+            self.auto_labeling,
+            shortcuts["auto"],
+            "auto",
+            "Auto Labeling using pretrained model (press Ctl+7 to auto labeling)",
+        )
+        
         openPrevImg = action(
             self.tr("&Prev Image"),
             self.openPrevImg,
@@ -380,6 +389,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.tr("Open prev (hold Ctl+Shift to copy labels)"),
             enabled=False,
         )
+
         save = action(
             self.tr("&Save\n"),
             self.saveFile,
@@ -794,6 +804,7 @@ class MainWindow(QtWidgets.QMainWindow):
             openNextImg=openNextImg,
             verify=verify,
             openPrevImg=openPrevImg,
+            autoLabeling=autoLabeling,
             fileMenuActions=(open_, opendir, save, saveAs, close, quit),
             tool=(),
             # XXX: need to add some actions here to activate the shortcut
@@ -897,6 +908,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 open_,
                 openNextImg,
                 openPrevImg,
+                autoLabeling,
                 verify,
                 opendir,
                 self.menus.recentFiles,
@@ -1001,6 +1013,8 @@ class MainWindow(QtWidgets.QMainWindow):
             delete,
             undo,
             brightnessContrast,
+            None,
+            autoLabeling,
             None,
             fitWindow,
             zoom,
@@ -3281,7 +3295,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def yolo_auto_labeling(self, weight_path=None, cfg_path='cfgs'):
         
         if weight_path == None:
-            weight_path = QFileDialog.getExistingDirectory(self, "Choose 'yolo_weights' folder:", 'yolo_weights', QFileDialog.ShowDirsOnly)
+            weight_path = QFileDialog.getExistingDirectory(self, "Choose 'yolo_weights (with *.pt)' folder:", 'yolo_weights', QFileDialog.ShowDirsOnly)
             if weight_path == '':
                 return
         
@@ -3290,7 +3304,7 @@ class MainWindow(QtWidgets.QMainWindow):
             if item.endswith('.h5') or item.endswith('.pt') or item.endswith('.pth'):
                 weight_list.append(item)
         if len(weight_list) == 0:
-            QMessageBox.information(self, u'Wrong!', u'have no weight file in this folder, please check again.')
+            QMessageBox.information(self, u'Wrong!', u'have no weight (with *.pt) file in this folder, please check again.')
             return
         items = tuple(weight_list)
         if len(weight_list) > 0 :
@@ -3302,7 +3316,7 @@ class MainWindow(QtWidgets.QMainWindow):
             else:
                 weights = os.path.join(weight_path, weights)
         else:
-            weights,_ = QFileDialog.getOpenFileName(self,"'yolo_weights' is empty, choose model weights file:")
+            weights,_ = QFileDialog.getOpenFileName(self,"'yolo_weights (with *.pt)' is empty, choose model weights file:")
             if not (weights.endswith('.pt') or weights.endswith('.pth')):
                 QMessageBox.information(self, u'Wrong!', u'weights file must endswith .h5 or .pt or .pth')
                 return
@@ -3319,7 +3333,7 @@ class MainWindow(QtWidgets.QMainWindow):
         model.to(device)
 
         if cfg_path == 'cfgs':
-            cfg_path = QFileDialog.getExistingDirectory(self, "Choose 'dataset configure' folder:", '', QFileDialog.ShowDirsOnly)
+            cfg_path = QFileDialog.getExistingDirectory(self, "Choose 'dataset configure (with *.yaml)' folder:", '', QFileDialog.ShowDirsOnly)
             if cfg_path == '':
                 return
 
@@ -3338,7 +3352,7 @@ class MainWindow(QtWidgets.QMainWindow):
             else:
                 cfgs = os.path.join(cfg_path, cfgs)
         else:
-            cfgs,_ = QFileDialog.getOpenFileName(self, "'cfgs' is empty, choose configure file:")
+            cfgs,_ = QFileDialog.getOpenFileName(self, "'dataset configure (with *.yaml)' is empty, choose configure file:")
             if not cfgs.endswith('.yaml'):
                 QMessageBox.information(self, u'Wrong!', u'configure file must endswith .yaml')
                 return
