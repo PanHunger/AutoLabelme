@@ -14,7 +14,11 @@
 
 ## 安装方法
 
-安装方法与Labelme相同，另外需要配置SAM2和Ultralystic，请参考对应的开源库
+安装方法与Labelme相同，另外需要配置SAM2和Ultralystic，请参考对应的开源库 
+
+建议使用 Anaconda 创建虚拟环境，命令如下：
+conda env create -f conda_environment.yml
+会创建一个名称为 auto-labelme 的虚拟环境
 
 ## 自动标注
 <div align="center">
@@ -27,6 +31,7 @@
 </div>
 
 ## 训练界面
+目前虽然可以有无代码的可视化训练界面，但是功能不完整，建议还是使用ultralystic的训练方法
 <div align="center">
   <img src="pics/trainapp.png" width="100%">
 </div>
