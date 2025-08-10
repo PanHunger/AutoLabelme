@@ -10,6 +10,7 @@
 - [x] 零代码操作完成训练与评估的便捷功能
 - [ ] 支持多人协同标注作业
 - [ ] 利用数据库存储标签和图片
+- [ ] 支持联网使用私人网盘的模型和配置
 
 
 ## 安装方法
@@ -28,6 +29,7 @@ conda env create -f conda_environment.yml
   <img src="pics/auto-label/4.png" width="70%">
   <img src="pics/auto-label/5.png" width="70%">
   <img src="pics/auto-label/6.png" width="70%">
+  <img src="pics/auto-label/7.png" width="70%">
 </div>
 
 ## 训练界面
