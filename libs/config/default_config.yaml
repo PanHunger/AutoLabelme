@@ -95,7 +95,8 @@ shortcuts:
   open_next: [D, Ctrl+Shift+D]
   open_prev: [A, Ctrl+Shift+A]
 
-  auto: [Ctrl+7]
+  auto: [Ctrl+Alt+L]
+  auto_this: [Ctrl+L]
 
   zoom_in: [Ctrl++, Ctrl+=]
   zoom_out: Ctrl+-

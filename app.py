@@ -8,6 +8,7 @@ import os.path as osp
 import re
 import sys
 import webbrowser
+import textwrap
 
 import imgviz
 import natsort
@@ -53,6 +54,7 @@ from libs.label_file import LabelFileError
 from libs.logger import logger
 from libs.shape import Shape
 from libs.widgets import AiPromptWidget
+from libs.widgets.yolo_sidebar_widget import YoloSidebarWidget
 from libs.widgets import BrightnessContrastDialog
 from libs.widgets import Canvas
 from libs.widgets import FileDialogPreview
@@ -302,6 +304,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.addDockWidget(Qt.RightDockWidgetArea, self.label_dock)
         self.addDockWidget(Qt.RightDockWidgetArea, self.shape_dock)
         self.addDockWidget(Qt.RightDockWidgetArea, self.file_dock)
+        # 添加YOLO自动标注设置侧边栏（左侧常驻）
+        self.yolo_sidebar = YoloSidebarWidget()
+        self.yolo_dock = QtWidgets.QDockWidget(self.tr("自动标注设置"), self)
+        self.yolo_dock.setObjectName("YoloSidebar")
+        self.yolo_dock.setWidget(self.yolo_sidebar)
+        self.yolo_dock.setFeatures(QtWidgets.QDockWidget.DockWidgetMovable | QtWidgets.QDockWidget.DockWidgetFloatable)
+        self.addDockWidget(Qt.LeftDockWidgetArea, self.yolo_dock)
 
         # Actions
         action = functools.partial(utils.newAction, self)
@@ -323,7 +332,8 @@ class MainWindow(QtWidgets.QMainWindow):
         file_pruning = action('file_pruning', self.remove_extra_img_xml, 'Ctrl+Alt+3', 'delete')
         change_label = action('change_label', self.change_label_name, 'Ctrl+4', 'color_line')
         fix_property = action('fix_property', self.fix_xml_property, 'Ctrl+5', 'color_line')
-        auto_labeling = action('auto_labeling', self.auto_labeling, 'Ctrl+6', 'new')
+        auto_labeling = action('auto_labeling', self.auto_labeling, 'Ctrl+Alt+L', 'new')
+        auto_labeling_this = action('auto_labeling_this', self.auto_labeling_this, 'Ctrl+L', 'new')
         data_augment = action('data_augment', self.data_auto_augment, 'Ctrl+7', 'copy')
         sam_optim = action('sam_optim', self.sam_optim, 'Ctrl+8', 'sam')
         folder_info = action('folder_info', self.show_folder_infor, 'Alt+1', 'help')
@@ -374,11 +384,19 @@ class MainWindow(QtWidgets.QMainWindow):
             )
         
         autoLabeling = action(
-            "&AUTO",
+            "&AUTO ALL",
             self.auto_labeling,
             shortcuts["auto"],
             "auto",
-            "Auto Labeling using pretrained model (press Ctl+7 to auto labeling)",
+            "Auto labeling dataset using pretrained model (press Ctl+7)",
+        )
+        
+        autoLabelingThis = action(
+            "&AUTO THIS",
+            self.auto_labeling_this,
+            shortcuts["auto_this"],
+            "auto",
+            "Auto labeling this image using pretrained model (press Ctl+8)",
         )
         
         openPrevImg = action(
@@ -805,6 +823,7 @@ class MainWindow(QtWidgets.QMainWindow):
             verify=verify,
             openPrevImg=openPrevImg,
             autoLabeling=autoLabeling,
+            autoLabelingThis=autoLabelingThis,
             fileMenuActions=(open_, opendir, save, saveAs, close, quit),
             tool=(),
             # XXX: need to add some actions here to activate the shortcut
@@ -888,7 +907,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 None,
                 label_pruning, file_pruning, change_label, fix_property,
                 None,
-                auto_labeling, data_augment, sam_optim,
+                auto_labeling, auto_labeling_this,
+                None,
+                data_augment, sam_optim,
                 None,
                 folder_info, label_info
             )
@@ -909,6 +930,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 openNextImg,
                 openPrevImg,
                 autoLabeling,
+                autoLabelingThis,
                 verify,
                 opendir,
                 self.menus.recentFiles,
@@ -997,6 +1019,7 @@ class MainWindow(QtWidgets.QMainWindow):
         ai_prompt_action = QtWidgets.QWidgetAction(self)
         ai_prompt_action.setDefaultWidget(self._ai_prompt_widget)
 
+        # 主界面的工具栏
         self.tools = self.toolbar("Tools")
         self.actions.tool = (
             open_,
@@ -1014,7 +1037,8 @@ class MainWindow(QtWidgets.QMainWindow):
             undo,
             brightnessContrast,
             None,
-            autoLabeling,
+            # autoLabeling,
+            autoLabelingThis,
             None,
             fitWindow,
             zoom,
@@ -3291,37 +3315,187 @@ class MainWindow(QtWidgets.QMainWindow):
             QMessageBox.information(self, u"Done!", u"fix xml's property done!")
         except Exception as e:
             QMessageBox.information(self, u'Sorry!', u'something is wrong. ({})'.format(e))
-     
+            
+    # 生成 LabelMe 格式的 JSON
+    def generate_labelme_json(self, image_path, segmentation_masks, cls, names, image_height, image_width, needed_labels, task, yes_or_no, tolerance):
+        labelme_data = {
+            "version": "5.5.0",
+            "flags": {},
+            "shapes": [],
+            "imagePath": os.path.basename(image_path),
+            "imageData": None,
+            "imageHeight": image_height,
+            "imageWidth": image_width,
+            "verified": False
+        }
+        for i, mask in enumerate(segmentation_masks):
+            label = names[cls[i]]
+            if label not in needed_labels:
+                continue
+            points = np.array(mask).reshape(-1, 2).tolist()
+            if yes_or_no and task == 'segment':
+                polygon = Polygon(points)
+                simplified_polygon = polygon.simplify(tolerance=tolerance, preserve_topology=True)
+                points = list(simplified_polygon.exterior.coords)
+            shape_type = "polygon" if task == 'segment' else "rectangle"
+            labelme_data["shapes"].append({
+                "label": label,
+                "points": points,
+                "group_id": None,
+                "description": "",
+                "shape_type": shape_type,
+                "flags": {},
+                "mask": None
+            })
+        return labelme_data
+
+    def yolo_auto_labeling_this(self, weight_path=None, cfg_path='cfgs'):
+        # 获取侧边栏widget
+        yolo_sidebar = getattr(self, 'yolo_sidebar', None)
+        if yolo_sidebar is None:
+            QMessageBox.information(self, '错误', '未找到自动标注设置侧边栏！')
+            return
+
+        # 获取参数
+        weights = yolo_sidebar.model_path_edit.text()
+        yaml_path = yolo_sidebar.yaml_path_edit.text()
+        conf_thres = yolo_sidebar.get_score_threshold()
+        iou_thres = yolo_sidebar.get_iou_threshold()
+        needed_labels = yolo_sidebar.get_selected_class()
+        imgsz = yolo_sidebar.get_imgsz()
+        yes_or_no = yolo_sidebar.get_simplify()
+        tolerance = yolo_sidebar.get_tolerance()
+        class_list = [yolo_sidebar.class_list.item(i).text() for i in range(yolo_sidebar.class_list.count())]
+        img_path = self.filePath
+
+        # 检查参数
+        if not weights or not yaml_path or not img_path:
+            QMessageBox.information(self, '参数缺失', '请设置模型路径、yaml路径和图片路径！')
+            return
+
+        # msg = f'请确认是否使用如下配置对当前图片自动标注：\n模型: {weights} \n配置: {yaml_path} \n图片: {img_path}'
+        # msg = textwrap.fill(msg, width=50)
+        # reply = QMessageBox.question(self, '自动标注确认', msg, QMessageBox.Ok | QMessageBox.Cancel, QMessageBox.Ok)
+        # if reply != QMessageBox.Ok:
+        #     return
+
+        # 推理当前图片
+        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        half = False
+        model = YOLO(weights)
+        task = model.task
+        model.to(device)
+        if half:
+            model.half()
+
+        # 读取图片
+        img = cv2.imread(img_path)
+        if img is None:
+            QMessageBox.information(self, '错误', f'无法读取图片: {img_path}')
+            return
+        # img_resized = cv2.resize(img, (imgsz, imgsz)) if imgsz else img
+
+        # 推理
+        result = model(img, augment=False, conf=conf_thres, iou=iou_thres)
+        cls = result[0].boxes.cls
+        cls = cls.cpu().numpy().astype(np.int32).tolist()
+        names = result[0].names
+        if task == "classify":
+            data = []
+        elif task == "detect":
+            try:
+                if result[0].boxes is None:
+                    QMessageBox.information(self, '提示', '未检测到目标。')
+                    return
+                data = result[0].boxes.xyxy.cpu().numpy()
+            except Exception as e:
+                QMessageBox.information(self, u'Sorry!', u'something is wrong. ({})'.format(e))
+                return
+        elif task == "obb":
+            data = []
+        elif task == "segment":
+            try:
+                if result[0].masks is None:
+                    QMessageBox.information(self, '提示', '未检测到分割掩码。')
+                    return
+                data = result[0].masks.xy.cpu().numpy()
+            except Exception as e:
+                QMessageBox.information(self, u'Sorry!', u'something is wrong. ({})'.format(e))
+                return
+        else:
+            QMessageBox.information(self, u'Sorry!', f'Unimplemented {task} task.')
+            return
+
+        height, width = img.shape[:2]
+        labelme_json = self.generate_labelme_json(img_path, data, cls, names, 
+                                                  height, width, needed_labels, 
+                                                  task, yes_or_no, tolerance)
+        json_path = img_path.rsplit('.', 1)[0] + ".json"
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(labelme_json, f, indent=4, ensure_ascii=False)
+        QMessageBox.information(self, u'Done!', f'auto labeling done for current image. 标注已保存到 {json_path}')
+        # 自动刷新当前图片和标注
+        self.loadFile(img_path)
+
     def yolo_auto_labeling(self, weight_path=None, cfg_path='cfgs'):
         
-        if weight_path == None:
-            weight_path = QFileDialog.getExistingDirectory(self, "Choose 'yolo_weights (with *.pt)' folder:", 'yolo_weights', QFileDialog.ShowDirsOnly)
-            if weight_path == '':
-                return
-        
-        weight_list=[]
-        for item in sorted(os.listdir(weight_path)):
-            if item.endswith('.h5') or item.endswith('.pt') or item.endswith('.pth'):
-                weight_list.append(item)
-        if len(weight_list) == 0:
-            QMessageBox.information(self, u'Wrong!', u'have no weight (with *.pt) file in this folder, please check again.')
+        # 获取侧边栏widget
+        yolo_sidebar = getattr(self, 'yolo_sidebar', None)
+        if yolo_sidebar is None:
+            QMessageBox.information(self, '错误', '未找到自动标注设置侧边栏！')
             return
-        items = tuple(weight_list)
-        if len(weight_list) > 0 :
-            weights, ok = QInputDialog.getItem(self, "Select",
-            f"Model weights file(under {weight_path}):", 
-            items, 0, False)
-            if not ok:
-                return
-            else:
-                weights = os.path.join(weight_path, weights)
-        else:
-            weights,_ = QFileDialog.getOpenFileName(self,"'yolo_weights (with *.pt)' is empty, choose model weights file:")
-            if not (weights.endswith('.pt') or weights.endswith('.pth')):
-                QMessageBox.information(self, u'Wrong!', u'weights file must endswith .h5 or .pt or .pth')
-                return
-        conf_thres = 0.5
-        iou_thres = 0.5
+        
+        # 获取参数
+        weights = yolo_sidebar.model_path_edit.text()
+        yaml_path = yolo_sidebar.yaml_path_edit.text()
+        conf_thres = yolo_sidebar.get_score_threshold()
+        iou_thres = yolo_sidebar.get_iou_threshold()
+        needed_labels = yolo_sidebar.get_selected_class()
+        imgsz = yolo_sidebar.get_imgsz()
+        yes_or_no = yolo_sidebar.get_simplify()
+        tolerance = yolo_sidebar.get_tolerance()
+        source = os.path.dirname(self.filePath)
+                
+        # 检查参数
+        if not weights or not yaml_path:
+            QMessageBox.information(self, '参数缺失', '请设置模型路径和yaml路径！')
+            return
+        
+        msg = f'请确认是否使用如下配置对整个数据集自动标注：\n模型: {weights} \n配置: {yaml_path} \n数据集: {source}'
+        msg = textwrap.fill(msg, width=50)
+        reply = QMessageBox.question(self, '自动标注确认', msg, QMessageBox.Ok | QMessageBox.Cancel, QMessageBox.Ok)
+        if reply != QMessageBox.Ok:
+            return
+        
+        # # if weight_path == None:
+        # #     weight_path = QFileDialog.getExistingDirectory(self, "Choose 'yolo_weights (with *.pt)' folder:", 'yolo_weights', QFileDialog.ShowDirsOnly)
+        # #     if weight_path == '':
+        # #         return
+        
+        # # weight_list=[]
+        # # for item in sorted(os.listdir(weight_path)):
+        # #     if item.endswith('.h5') or item.endswith('.pt') or item.endswith('.pth'):
+        # #         weight_list.append(item)
+        # # if len(weight_list) == 0:
+        # #     QMessageBox.information(self, u'Wrong!', u'have no weight (with *.pt) file in this folder, please check again.')
+        # #     return
+        # # items = tuple(weight_list)
+        # # if len(weight_list) > 0 :
+        # #     weights, ok = QInputDialog.getItem(self, "Select",
+        # #     f"Model weights file(under {weight_path}):", 
+        # #     items, 0, False)
+        # #     if not ok:
+        # #         return
+        # #     else:
+        # #         weights = os.path.join(weight_path, weights)
+        # # else:
+        # #     weights,_ = QFileDialog.getOpenFileName(self,"'yolo_weights (with *.pt)' is empty, choose model weights file:")
+        # #     if not (weights.endswith('.pt') or weights.endswith('.pth')):
+        # #         QMessageBox.information(self, u'Wrong!', u'weights file must endswith .h5 or .pt or .pth')
+        # #         return
+        # conf_thres = self._ai_prompt_widget.get_iou_threshold()
+        # iou_thres = self._ai_prompt_widget.get_score_threshold()
+        
         # Initialize
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         # half = device.type != 'cpu'  # half precision only supported on CUDA
@@ -3332,74 +3506,67 @@ class MainWindow(QtWidgets.QMainWindow):
         task = model.task
         model.to(device)
 
-        if cfg_path == 'cfgs':
-            cfg_path = QFileDialog.getExistingDirectory(self, "Choose 'dataset configure (with *.yaml)' folder:", '', QFileDialog.ShowDirsOnly)
-            if cfg_path == '':
-                return
+        # if cfg_path == 'cfgs':
+        #     cfg_path = QFileDialog.getExistingDirectory(self, "Choose 'dataset configure (with *.yaml)' folder:", '', QFileDialog.ShowDirsOnly)
+        #     if cfg_path == '':
+        #         return
 
-        cfg_list = []
-        for item in sorted(os.listdir(cfg_path)):
-            if item.endswith('.yaml'):
-                cfg_list.append(item)
-        items = tuple(cfg_list)
-        if len(cfg_list) > 0 :
-            cfgs, ok = QInputDialog.getItem(self, 
-                                            "Select", 
-                                            "Configure file:", 
-                                            items, 0, False)
-            if not ok:
-                return
-            else:
-                cfgs = os.path.join(cfg_path, cfgs)
-        else:
-            cfgs,_ = QFileDialog.getOpenFileName(self, "'dataset configure (with *.yaml)' is empty, choose configure file:")
-            if not cfgs.endswith('.yaml'):
-                QMessageBox.information(self, u'Wrong!', u'configure file must endswith .yaml')
-                return
+        # cfg_list = []
+        # for item in sorted(os.listdir(cfg_path)):
+        #     if item.endswith('.yaml'):
+        #         cfg_list.append(item)
+        # items = tuple(cfg_list)
+        # if len(cfg_list) > 0 :
+        #     cfgs, ok = QInputDialog.getItem(self, 
+        #                                     "Select", 
+        #                                     "Configure file:", 
+        #                                     items, 0, False)
+        #     if not ok:
+        #         return
+        #     else:
+        #         cfgs = os.path.join(cfg_path, cfgs)
+        # else:
+        #     cfgs,_ = QFileDialog.getOpenFileName(self, "'dataset configure (with *.yaml)' is empty, choose configure file:")
+        #     if not cfgs.endswith('.yaml'):
+        #         QMessageBox.information(self, u'Wrong!', u'configure file must endswith .yaml')
+        #         return
 
-        # 读取 YAML 文件
-        with open(cfgs, 'r', encoding='utf-8') as file:
-            data = yaml.safe_load(file)
+        # # 读取 YAML 文件
+        # with open(cfgs, 'r', encoding='utf-8') as file:
+        #     data = yaml.safe_load(file)
             
-        # 提取 names 部分的内容并放入字典中
-        names = [value for key, value in data['names'].items()]                     
-        if len(names) == 1:
-            needed_labels = names
-        else:
-            msg = "Select labels you want auto-labeling?"
-            title = "Select Labels"      
-            sorted_names = sorted(names) 
-            dialog = MultiChoiceDialog(msg, title, sorted_names)
-            if dialog.exec_() == QDialog.Accepted:
-                needed_labels = dialog.selected_choices()
-                print("Selected labels:", needed_labels)
-            else:
-                print("Dialog cancelled")
-                return
-        
+        # # 提取 names 部分的内容并放入字典中
+        # names = [value for key, value in data['names'].items()]                     
+        # if len(names) == 1:
+        #     needed_labels = names
+        # else:
+        #     msg = "Select labels you want auto-labeling?"
+        #     title = "Select Labels"      
+        #     sorted_names = sorted(names) 
+        #     dialog = MultiChoiceDialog(msg, title, sorted_names)
+        #     if dialog.exec_() == QDialog.Accepted:
+        #         needed_labels = dialog.selected_choices()
+        #         print("Selected labels:", needed_labels)
+        #     else:
+        #         print("Dialog cancelled")
+        #         return
+              
         # 询问是否使用 Simplify 来稀疏多边形
-        # 没有取消选项，只有是和否
-        # reply = QMessageBox.question(self, 'Message', 'Whether use Simplify to rarefy polygon?', QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-        # yes_or_no = True if reply == QMessageBox.Yes else False
         # 如果选择了是，则询问容差值
-        items = tuple(["Yes", "No"])
-        yes_or_no, ok = QInputDialog.getItem(self, 
-                                             "Select",
-                                             'Whether use Simplify to rarefy polygon?', 
-                                             items, 0, False)
-        if not ok:
+        msg = f'请确认是否使用如下配置对整个数据集自动标注：\n模型: {weights} \n配置: {yaml_path} \n数据集: {source}'
+        msg = textwrap.fill(msg, width=50)
+        reply = QMessageBox.question(self, '自动标注确认', msg, QMessageBox.Ok | QMessageBox.Cancel, QMessageBox.Ok)
+        if reply != QMessageBox.Ok:
             return
-        else:
-            yes_or_no = True if yes_or_no == "Yes" else False
+        # # if weight_path == None:
+        #     yes_or_no = True if yes_or_no == "Yes" else False
         
-        # set imsize
-        if yes_or_no:
-            tolerance, OK = QInputDialog.getInt(self, 'Simplify Setting', 'tolerance value (default=0.5):', value=5)
-            if not OK:
-                return
-        
-        imgsz = 640
-        
+        # # set imsize
+        # if yes_or_no:
+        #     tolerance, OK = QInputDialog.getInt(self, 'Simplify Setting', 'tolerance value (default=0.5):', value=5)
+        #     if not OK:
+        #         return
+                
         # 函数：将图像转换为Base64编码
         def image_to_base64(image_path):
             # 打开图像文件
@@ -3411,57 +3578,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
             return img_str
         
-        # 函数：生成 LabelMe 格式的 JSON
-        def generate_labelme_json(image_path, segmentation_masks, cls, names, image_height, image_width, needed_labels):
-            labelme_data = {
-                "version": "5.5.0",
-                "flags": {},
-                "shapes": [],
-                "imagePath": os.path.basename(image_path),
-                # "imageData": image_to_base64(image_path),
-                "imageData": None,
-                "imageHeight": image_height,
-                "imageWidth": image_width,
-                "verified": False
-            }
-
-            for i, mask in enumerate(segmentation_masks):
-                label = names[cls[i]]
-                if label not in needed_labels:
-                    continue
-                
-                # 将分割掩码坐标转换为多边形的坐标
-                points = np.array(mask).reshape(-1, 2).tolist()
-                
-                if yes_or_no:
-                    # 创建一个Shapely多边形对象
-                    polygon = Polygon(points)
-
-                    # 使用simplify方法简化多边形，指定容忍度（误差阈值）
-                    simplified_polygon = polygon.simplify(tolerance=tolerance, preserve_topology=True)
-
-                    # 获取简化后的点集
-                    points = list(simplified_polygon.exterior.coords)
-
-                # 根据需求判断是矩形还是多边形
-                shape_type = "polygon" if task == 'segment' else "rectangle"
-
-                # 添加标注信息
-                labelme_data["shapes"].append({
-                    "label": label,
-                    "points": points,
-                    "group_id": None,
-                    "description": "",
-                    "shape_type": shape_type,
-                    "flags": {},
-                    "mask": None  # 如果有需要，也可以通过mask提供图像数据
-                })
-
-            return labelme_data
-        
-        source = os.path.dirname(self.filePath)
-
-        imgsz = imgsz  # check img_size
         if half:
             model.half()  # to FP16
         
@@ -3494,10 +3610,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 return
 
             # Inference
-            result = model(im0s, augment=False)
+            result = model(im0s, augment=False, conf=conf_thres, iou=iou_thres)
             cls = result[0].boxes.cls
             cls = cls.cpu().numpy().astype(np.int32).tolist()
-            names = result[0].names
+            names = result[0].names.cpu()
                 
             if task == "classify":
                 pass
@@ -3505,7 +3621,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 try:
                     if result[0].boxes is None:
                         continue
-                    data = result[0].boxes.xyxy
+                    data = result[0].boxes.xyxy.cpu().numpy()
                 except Exception as e:
                     QMessageBox.information(self, u'Sorry!', u'something is wrong. ({})'.format(e))
             elif task == "obb":
@@ -3514,7 +3630,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 try:
                     if result[0].masks is None:
                         continue
-                    data = result[0].masks.xy
+                    data = result[0].masks.xy.cpu().numpy()
                 except Exception as e:
                     QMessageBox.information(self, u'Sorry!', u'something is wrong. ({})'.format(e))           
             else:
@@ -3522,7 +3638,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 
             height, width, _ = im0s.shape
             # 生成 LabelMe 格式的标注数据
-            labelme_json = generate_labelme_json(path, data, cls, names, height, width, needed_labels)
+            labelme_json = self.generate_labelme_json(path, data, cls, names, 
+                                                      height, width, needed_labels,
+                                                      task, yes_or_no, tolerance)
 
             # 将结果保存为JSON文件
             json_path = path.split('.')[0] + ".json"
@@ -3534,8 +3652,32 @@ class MainWindow(QtWidgets.QMainWindow):
                 
         progress.setValue(100)
         QMessageBox.information(self, u'Done!', f'auto labeling done. {success_index}/{index+1} images have got auto labels. \nplease reload img folder')
-            
-                    
+
+    def auto_labeling_this(self):
+        """use model to labeling unannotated imgs.
+        you should choose model type as well as model weights file and input label name.
+        supported model type is 'yolo' or 'Retinanet', more type will updating later.
+        'label name' must sorted by class number, if you do not remenber them, just press 'Enter', 
+        box will named by its class number and you can change them one by one using action <change_label>
+        for a recorde, yolo do not need 'label name', but 'img size' additionally.
+        this action may take some time, please don't click mouse too frequently.
+        """
+        if self.filePath == None:
+            QMessageBox.information(self,u'Wrong!',u'have no loaded folder yet, please check again.')
+            return
+        try:
+            #=====choose model and input label name=====
+            # using yolo autolabeling   
+            with torch.no_grad():
+                self.yolo_auto_labeling_this()
+            if self.filename:
+                self.loadFile(self.filename)
+                self.labelOrderChanged()
+            return
+        
+        except Exception as e:
+            QMessageBox.information(self,u'Sorry!',u'something is wrong. ({})'.format(e))
+               
     def auto_labeling(self):
         """use model to labeling unannotated imgs.
         you should choose model type as well as model weights file and input label name.
@@ -3557,7 +3699,7 @@ class MainWindow(QtWidgets.QMainWindow):
         
         except Exception as e:
             QMessageBox.information(self,u'Sorry!',u'something is wrong. ({})'.format(e))
-        
+            
     def data_auto_augment(self):
         """data augment, using Affine change, intensity change, contrast change, gama change, Gaussian fillter to augment img data.
         you can select augment multiple(1~4).
