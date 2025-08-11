@@ -253,20 +253,20 @@ class HelpDialog(QDialog):
         help_text = QTextEdit()
         help_text.setReadOnly(True)  # 设置为只读模式
         help_text.setText(
-            """
-标注文件夹路径: 标注的xml, json文件，默认和图片在一个文件夹内
-图片文件夹路径: 图片文件夹的路径，注意不要使用中文路径
-预训练权重路径: 如果有预训练权重文件（如yolov8n.pt），可将此文件路径填入，否则保持为空
-模型输入尺寸:   尽量保证是32的倍数，不需要跟你的图像匹配一致；默认为640，适合绝大多数的检测
-每批图像数量:   每一次训练时的图片数量，-1表示自动识别，大约使用60%的显存，内存古用大约是显存的3-4倍，数值越大训练越快，请预留一定的空间，过高的值会导致内存不足中断
-最大训练次数:   可以设置高一些，如果训练已达到最优，训练会自动停止，并非跑完所有次数
-使用GPU训练:    编号填写GPU的索引，若使用多块GPU可填写0,1,2,3这样，注意英文逗号；取消勾选则使用cpu训练
-无改善停止数:   当模型已经达到最优效果时，最多可额外尝试的次数，到达该次数发现无明显改善会自动停止训练防止过拟合
-加载线程数:     加载数据时的工作线程数。可以使用多个线程并行地加载数据，以提高数据读取速度。具体的最佳值取决于硬件和数据集的大小
-标注类型:       矩形标注会生成常规检测数据集，多边形标注会生成分制数据集，矩形+点标注会生成关键点数据集;如果指定了错误的类型，会被过滤掉，不可同时使用矩形和多边形混合标注
-模型大小:       预设的模型大小，n-x从小到大，模型越大精度越高，但推理速度会越慢
-小目标检测增强:  YOLO对过小的目标检测精度一般，如果训练后发现识制率不够，那么可以启用该选项
-"""
+        """
+        标注文件夹路径: 标注的xml, json文件，默认和图片在一个文件夹内
+        图片文件夹路径: 图片文件夹的路径，注意不要使用中文路径
+        预训练权重路径: 如果有预训练权重文件（如yolov8n.pt），可将此文件路径填入，否则保持为空
+        模型输入尺寸:   尽量保证是32的倍数，不需要跟你的图像匹配一致；默认为640，适合绝大多数的检测
+        每批图像数量:   每一次训练时的图片数量，-1表示自动识别，大约使用60%的显存，内存古用大约是显存的3-4倍，数值越大训练越快，请预留一定的空间，过高的值会导致内存不足中断
+        最大训练次数:   可以设置高一些，如果训练已达到最优，训练会自动停止，并非跑完所有次数
+        使用GPU训练:    编号填写GPU的索引，若使用多块GPU可填写0,1,2,3这样，注意英文逗号；取消勾选则使用cpu训练
+        无改善停止数:   当模型已经达到最优效果时，最多可额外尝试的次数，到达该次数发现无明显改善会自动停止训练防止过拟合
+        加载线程数:     加载数据时的工作线程数。可以使用多个线程并行地加载数据，以提高数据读取速度。具体的最佳值取决于硬件和数据集的大小
+        标注类型:       矩形标注会生成常规检测数据集，多边形标注会生成分制数据集，矩形+点标注会生成关键点数据集;如果指定了错误的类型，会被过滤掉，不可同时使用矩形和多边形混合标注
+        模型大小:       预设的模型大小，n-x从小到大，模型越大精度越高，但推理速度会越慢
+        小目标检测增强:  YOLO对过小的目标检测精度一般，如果训练后发现识制率不够，那么可以启用该选项
+        """
         )
         layout.addWidget(help_text)
 
@@ -362,13 +362,41 @@ class TrainingInterface(QWidget):
         self.img_path = QLineEdit(img_path)
         self.annotation_path = QLineEdit(annotation_path)
         self.pretrained_path = QLineEdit(pretrained_path)
+        self.train_path = QLineEdit()
+        self.valid_path = QLineEdit()
+        self.yaml_path = QLineEdit()
         self.train_thread = None
         self.weights_path = None
         self.cfg_path = None
         self.init_ui()
 
+    def choose_json_path(self):
+        path = QFileDialog.getExistingDirectory(self, '选择 JSON 标注文件夹路径', '')
+        if path:
+            self.annotation_path.setText(path)
+
+    def choose_img_path(self):
+        path = QFileDialog.getExistingDirectory(self, '选择 IMAGE 图片文件夹路径', '')
+        if path:
+            self.img_path.setText(path)
+            
+    def choose_save_path(self):
+        path = QFileDialog.getExistingDirectory(self, '选择训练结果保存文件夹路径', '')
+        if path:
+            self.img_path.setText(path)
+
+    def choose_pretrained_path(self):
+        path, _ = QFileDialog.getOpenFileName(self, '选择预训练 pt 文件', '', 'pt 文件 (*.pt);;所有文件 (*)')
+        if path:
+            self.pretrained_path.setText(path)
+
+    def choose_yaml_path(self):
+        path, _ = QFileDialog.getOpenFileName(self, '选择数据集配置 yaml 文件', '', 'yaml 文件 (*.yaml);;所有文件 (*)')
+        if path:
+            self.yaml_path.setText(path)
+
     def init_ui(self):
-        self.setWindowTitle("Train with Labels")
+        self.setWindowTitle("YOLO 训练程序")
         self.resize(1200, 980)
         # Main Layout
         main_layout = QVBoxLayout()
@@ -413,21 +441,62 @@ class TrainingInterface(QWidget):
 
         # File paths
         file_layout = QGridLayout()
-        file_layout.addWidget(QLabel("标注文件夹路径："), 0, 0)
+        file_layout.addWidget(QLabel("JSON 标注文件夹路径 (可选):"), 0, 0)
+        annotation_path_btn = QPushButton("...")
+        annotation_path_btn.setFixedWidth(50)
+        annotation_path_btn.clicked.connect(self.choose_json_path)
         file_layout.addWidget(self.annotation_path, 0, 1)
+        file_layout.addWidget(annotation_path_btn, 0, 2)
 
-        file_layout.addWidget(QLabel("图片文件夹路径："), 1, 0)
+        file_layout.addWidget(QLabel("IMAGE 图片文件夹路径 (可选):"), 1, 0)
+        img_path_btn = QPushButton("...")
+        img_path_btn.setFixedWidth(50)
+        img_path_btn.clicked.connect(self.choose_img_path)
         file_layout.addWidget(self.img_path, 1, 1)
+        file_layout.addWidget(img_path_btn, 1, 2)
 
-        file_layout.addWidget(QLabel("预训练权重路径："), 2, 0)
+        file_layout.addWidget(QLabel("预训练权重路径 (可选):"), 2, 0)
+        pretrained_path_btn = QPushButton('...')
+        pretrained_path_btn.setFixedWidth(50)
+        pretrained_path_btn.clicked.connect(self.choose_pretrained_path)
         file_layout.addWidget(self.pretrained_path, 2, 1)
+        file_layout.addWidget(pretrained_path_btn, 2, 2)
 
-        file_layout.addWidget(QLabel("模型/Yaml保存路径："), 3, 0)
+        file_layout.addWidget(QLabel("训练结果保存路径:"), 3, 0)
+        save_path_btn = QPushButton("...")
+        save_path_btn.setFixedWidth(50)
+        save_path_btn.clicked.connect(self.choose_save_path)
         if self.img_path.text() != "":
-            self.save_path = QLineEdit(os.path.join("yolo_weights", self.img_path.text().split("\\")[-3]))
+            self.save_path = QLineEdit(os.path.join("yolo_weights", self.img_path.text()))
         else:
             self.save_path = QLineEdit("yolo_weights\\")
         file_layout.addWidget(self.save_path, 3, 1)
+        file_layout.addWidget(save_path_btn, 3, 2)
+
+        file_layout.addWidget(QLabel("Train 训练集文件夹路径:"), 4, 0)
+        train_path_btn = QPushButton("...")
+        train_path_btn.setFixedWidth(50)
+        train_path_btn.clicked.connect(self.choose_img_path)
+        file_layout.addWidget(self.train_path, 4, 1)
+        file_layout.addWidget(train_path_btn, 4, 2)
+
+        file_layout.addWidget(QLabel("Valid 验证集文件夹路径 (可选):"), 5, 0)
+        valid_path_btn = QPushButton('...')
+        valid_path_btn.setFixedWidth(50)
+        valid_path_btn.clicked.connect(self.choose_pretrained_path)
+        file_layout.addWidget(self.valid_path, 5, 1)
+        file_layout.addWidget(valid_path_btn, 5, 2)
+
+        file_layout.addWidget(QLabel("Yaml 数据集配置 (Path, Name) 文件路径:"), 6, 0)
+        yaml_path_btn = QPushButton('...')
+        yaml_path_btn.setFixedWidth(50)
+        yaml_path_btn.clicked.connect(self.choose_yaml_path)
+        if self.img_path.text() != "":
+            self.yaml_path = QLineEdit(os.path.join("cfgs", self.img_path+'.yaml'))
+        else:
+            self.yaml_path = QLineEdit("cfgs\\.yaml")
+        file_layout.addWidget(self.yaml_path, 6, 1)
+        file_layout.addWidget(yaml_path_btn, 6, 2)
 
         main_layout.addLayout(file_layout)
 
@@ -436,19 +505,31 @@ class TrainingInterface(QWidget):
         params_layout = QGridLayout()
 
         params_layout.addWidget(QLabel("模型输入尺寸"), 0, 0)
-        self.input_size = QLineEdit("640")
+        self.input_size = QSpinBox()
+        self.input_size.setRange(64, 4096)
+        self.input_size.setSingleStep(32)
+        self.input_size.setValue(640)
         params_layout.addWidget(self.input_size, 0, 1)
 
         params_layout.addWidget(QLabel("每批图像数量"), 0, 2)
-        self.batch_size = QLineEdit("-1")
+        self.batch_size = QSpinBox()
+        self.batch_size.setRange(-1, 128)
+        self.batch_size.setSingleStep(1)
+        self.batch_size.setValue(-1)
         params_layout.addWidget(self.batch_size, 0, 3)
 
         params_layout.addWidget(QLabel("最大训练次数"), 1, 0)
-        self.max_epochs = QLineEdit("100")
+        self.max_epochs = QSpinBox()
+        self.max_epochs.setRange(20, 1000)
+        self.max_epochs.setSingleStep(10)
+        self.max_epochs.setValue(100)
         params_layout.addWidget(self.max_epochs, 1, 1)
 
         params_layout.addWidget(QLabel("无改善停止次数"), 1, 2)
-        self.patience = QLineEdit("20")
+        self.patience = QSpinBox()
+        self.patience.setRange(5, 100)
+        self.patience.setSingleStep(1)
+        self.patience.setValue(20)
         params_layout.addWidget(self.patience, 1, 3)
 
         self.use_gpu = QCheckBox("使用GPU训练")
@@ -459,7 +540,9 @@ class TrainingInterface(QWidget):
 
         params_layout.addWidget(QLabel("加载线程数"), 2, 2)
         self.num_threads = QSpinBox()
-        self.num_threads.setValue(4)
+        self.num_threads.setRange(1, 16)
+        self.num_threads.setSingleStep(1)
+        self.num_threads.setValue(8)
         params_layout.addWidget(self.num_threads, 2, 3)
         
         params_layout.addWidget(QLabel("模型大小"), 3, 0)
@@ -480,24 +563,39 @@ class TrainingInterface(QWidget):
         self.p2 = QCheckBox("小目标检测P2增强")
         params_layout.addWidget(self.p2, 4, 0)
         
-        self.val = QCheckBox("分配10%验证集")
+        self.val = QCheckBox("自动分配 10% 验证集")
         params_layout.addWidget(self.val, 4, 2)
 
         # self.auto_correct = QCheckBox("自动修正图像格式")
         # params_layout.addWidget(self.auto_correct, 4, 2)
         
         params_layout.addWidget(QLabel("旋转角度"), 5, 0)
-        self.degree = QSpinBox()
-        self.degree.setValue(0)
-        self.degree.setRange(0, 90)
+        self.degree = QDoubleSpinBox()
+        self.degree.setValue(0.0)
+        self.degree.setRange(0.0, 1.0)
+        self.degree.setSingleStep(0.01)
         params_layout.addWidget(self.degree, 5, 1)
 
         params_layout.addWidget(QLabel("缩放比例"), 5, 2)
-        self.scale = QSpinBox()
-        self.scale.setRange(0, 20)
-        self.scale.setValue(10)
-
+        self.scale = QDoubleSpinBox()
+        self.scale.setValue(0.5)
+        self.scale.setRange(0.0, 1.0)
+        self.scale.setSingleStep(0.01)
         params_layout.addWidget(self.scale, 5, 3)
+
+        params_layout.addWidget(QLabel("左右翻转概率"), 6, 0)
+        self.fliplr = QDoubleSpinBox()
+        self.fliplr.setValue(0.5)
+        self.fliplr.setRange(0.0, 1.0)
+        self.fliplr.setSingleStep(0.01)
+        params_layout.addWidget(self.fliplr, 6, 1)
+
+        params_layout.addWidget(QLabel("上下翻转概率"), 6, 2)
+        self.flipud = QDoubleSpinBox()
+        self.flipud.setRange(0.0, 1.0)
+        self.flipud.setValue(0.5)
+        self.flipud.setSingleStep(0.01)
+        params_layout.addWidget(self.flipud, 6, 3)
         
         params_group.setLayout(params_layout)
         main_layout.addWidget(params_group)
@@ -531,8 +629,15 @@ class TrainingInterface(QWidget):
         self.progress_bar = QProgressBar()
         main_layout.addWidget(self.progress_bar)
 
-        # Buttons        
         button_layout = QHBoxLayout()
+
+        convert_button = QPushButton("一键转换为 YOLO 格式")
+        add_shadow_effect(convert_button)
+        convert_button.setFont(custom_font)
+        convert_button.clicked.connect(self.convert_to_yolo)
+        button_layout.addWidget(convert_button)
+
+        # Buttons        
         self.train_button = QPushButton("开始训练")
         add_shadow_effect(self.train_button)
         self.train_button.setFont(custom_font)
@@ -552,6 +657,7 @@ class TrainingInterface(QWidget):
                 background-color: #698B69;
             }
         """)
+        button_layout.addWidget(self.train_button)
         
         self.train_button.clicked.connect(self.start_training)
         
@@ -559,8 +665,8 @@ class TrainingInterface(QWidget):
         add_shadow_effect(help_button)
         help_button.setFont(custom_font)
         help_button.clicked.connect(self.show_help_dialog)
-        button_layout.addWidget(self.train_button)
         button_layout.addWidget(help_button)
+
         main_layout.addLayout(button_layout)
 
         # Set main layout
@@ -601,6 +707,9 @@ class TrainingInterface(QWidget):
         # 示例：self.training_process.terminate()
         # 示例：del self.some_temp_data
 
+    def convert_to_yolo(self):
+        pass
+
     def show_help_dialog(self):
         help_dialog = HelpDialog()
         help_dialog.exec_()
@@ -618,25 +727,6 @@ class TrainingInterface(QWidget):
         """启动训练任务"""
         if self.annotation_path.text() == "" or self.img_path.text() == "":
             return QMessageBox.critical(self, "错误", "请填写标注文件夹路径和图片文件夹路径！")
-        
-        # 获取用户输入参数
-        version = self.model_version_combo.currentText()[5:]
-        pretrained_model = self.pretrained_path.text()
-        
-        batch_size = int(self.batch_size.text())
-        epochs = int(self.max_epochs.text())
-        patience = int(self.patience.text())
-        workers = self.num_threads.value()
-        
-        degree = int(self.degree.text())
-        scale = float(self.scale.text()) / 10
-        
-        imgsz = int(self.input_size.text())
-        
-        if self.use_gpu.isChecked() and torch.cuda.is_available():
-            device = self.gpus.text()
-        else:
-            device = "cpu"
             
         if self.size_n.isChecked():
             model_type = "n"
@@ -650,46 +740,42 @@ class TrainingInterface(QWidget):
             model_type = "x"
         else:
             model_type = "n"
-        
-        p2 = ""
-        if self.p2.isChecked():
-            p2 = "-p2"
             
-        # # 使用 os.path.dirname 获取父目录路径
-        # base_path = os.path.dirname(self.save_path.text())
-        # # 使用 os.path.basename 获取最后的目录或文件名
-        # folder_name = os.path.basename(self.save_path.text())
-        
-        base_path = self.save_path.text()
         # 获取当前时间，格式化时间为字符串，例如：2023-10-05_14-30-00
         current_time = datetime.datetime.now()
-        
+
         label_img_num = len(glob(os.path.join(self.img_path.text(), "*.json")))
         folder_name = current_time.strftime("%Y-%m-%d_%H-%M-%S") + f"_with_{label_img_num}_images"
-            
+
+        self.weights_path = os.path.join(self.save_path.text(), folder_name, "weights")
+        self.cfg_path = os.path.join("./cfgs", f"{os.path.basename(self.save_path.text())}.yaml")
+
         params = {
-            "version": version,
+            "version": self.model_version_combo.currentText()[5:],
             "model_type": model_type,
-            "pretrained_model": pretrained_model,
-            "device": device,
-            "batch_size": batch_size,
-            "epochs": epochs,
-            "degree": degree,
-            "scale": scale,
-            "imgsz": imgsz,
-            "workers": workers,
-            "patience": patience,
-            "p2": p2,
+            "pretrained_model": self.pretrained_path.text(),
+            "device": self.gpus.text() if self.use_gpu.isChecked() and torch.cuda.is_available() else "cpu",
+            "batch_size": int(self.batch_size.value()),
+            "epochs": int(self.max_epochs.value()),
+            "degree": float(self.degree.value()),
+            "scale": float(self.scale.value()),
+            "imgsz": int(self.input_size.value()),
+            "workers": self.num_threads.value(),
+            "patience": int(self.patience.value()),
+            "fliplr": self.fliplr.value(),
+            "flipud": self.flipud.value(),
+            "p2": "-p2" if self.p2.isChecked() else "",
             "train_type_combo": self.train_type_combo.currentText(),
-            "base_path": base_path,
+            "base_path": self.save_path.text(),
             "folder_name": folder_name,
             "annotation_path": self.annotation_path.text(),
             "image_path": self.img_path.text(),
-            "val": self.val.isChecked()
+            "val": self.val.isChecked(),
+            "train_path": self.train_path.text(),
+            "val_path": self.valid_path.text(),
+            "yaml_path": self.yaml_path.text(),
+            "cfg_path": self.cfg_path
         }
-        
-        self.weights_path = os.path.join(base_path, folder_name, "weights")
-        self.cfg_path = os.path.join("./cfgs", f"{os.path.basename(base_path)}.yaml")
 
         # 启动训练线程
         self.train_thread = TrainThread(params, self.train_button)
@@ -980,24 +1066,20 @@ class TrainThread(QThread):
                 model = YOLO(pretrained_model)
             self.log_signal.emit("成功加载模型...")
                 
-            self.log_signal.emit("加载数据...")
+            self.log_signal.emit("将 Labelme 的 JSON 标注转换成 YOLO 的 txt 标注...")
             # 获取所有标签
             unique_labels, labels_dict = self.find_unique_labels_in_directory(self.params['annotation_path'])
-            
-            print(unique_labels)
-            print(labels_dict)
-            
+            print("唯一标签: ", unique_labels)
+            print("标签字典: ", labels_dict)
             if len(unique_labels) > 1:
                 needed_labels = None
                 while needed_labels is None:
                     # 提取 names 部分的内容并放入字典中   
                     needed_labels = easygui.multchoicebox(msg="select labels you want auto-labeing?",title="Setect labels",choices=tuple(unique_labels,))               
-                    
                     if needed_labels == None:
                         self.log_signal.emit("重新选择标签...")
             else:
-                self.log_signal.emit("此数据集中仅有<1>个标签！不需要选择标签！")
-            
+                self.log_signal.emit("此数据集中仅有 <1> 个标签! 不需要选择标签!")
             # 将 json 文件转换为 txt 文件
             self.convert_json2txt(anno_dir=os.path.dirname(self.params['annotation_path']), 
                                   image_dir=os.path.dirname(self.params['image_path']), 
@@ -1009,14 +1091,13 @@ class TrainThread(QThread):
             else:
                 train_folder = "images\\" + os.path.basename(self.params['image_path'])
                 val_folder = train_folder
-            
             print(f"train_folder: {train_folder}, val_folder: {val_folder}")
             self.generate_dataset_yaml(dataset_path=os.path.dirname(os.path.dirname(image_path)),
                                         train_folder=train_folder,
                                         val_folder=val_folder,  # 没有验证集
                                         labels_dict=labels_dict,
                                         output_file=cfg_path)
-            self.log_signal.emit("成功加载数据...")
+            self.log_signal.emit("成功加载数据!")
 
             # 自定义训练过程的回调函数，用于更新进度
             def on_train_epoch_start(trainer):
@@ -1054,7 +1135,7 @@ class TrainThread(QThread):
             
             # 开始训练
             results = model.train(
-                data=cfg_path,
+                data=self.params['cfg_path'],
                 epochs=epochs,
                 imgsz=imgsz,
                 batch=batch_size,

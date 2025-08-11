@@ -318,9 +318,9 @@ class MainWindow(QtWidgets.QMainWindow):
         
         # 训练模型 action：
         # 选择任务、选择模型、选择数据集 yaml 文件、设置训练集\验证集比例、设置 batch_size、是否从头训练
-        train_with_labels = action('train_with_labels', self.train_with_labels, 'Alt+F1', 'train model with already labeled data')
-        analyse_result = action('analyse_result', self.analyse_result, 'Alt+F2', 'analyse training result')
-        delete_unchecked = action('delete_unchecked', self.delete_unchecked, 'Alt+F1', 'delect all unchecked labels')
+        train_with_labels = action('训练YOLO模型', self.train_with_labels, 'Alt+F1', 'train model with already labeled data')
+        analyse_result = action('分析训练结果', self.analyse_result, 'Alt+F2', 'analyse training result')
+        delete_unchecked = action('删除未检查的标签', self.delete_unchecked, 'Alt+F1', 'delect all unchecked labels')
         
         # 自动标注 action：
         search_system = action('Search_System', self.search_actions_info, None, 'zoom-in')
@@ -883,9 +883,9 @@ class MainWindow(QtWidgets.QMainWindow):
             file=self.menu(self.tr("&File")),
             edit=self.menu(self.tr("&Edit")),
             view=self.menu(self.tr("&View")),
-            training=self.menu(self.tr('Training-Tools')),
-            annotate=self.menu(self.tr('&Annotate-Tools')),
-            video=self.menu(self.tr('&Video-Tools')),
+            training=self.menu('训练工具'),
+            annotate=self.menu('标注工具'),
+            video=self.menu('视频工具'),
             help=self.menu(self.tr("&Help")),
             recentFiles=QtWidgets.QMenu(self.tr("Open &Recent")),
             labelList=labelMenu,
