@@ -184,6 +184,14 @@ def apply_stylesheet(app):
             font-size: 16px;
             padding: 5px;
         }
+        QDoubleSpinBox {
+            background-color: #2A2A36;
+            color: #DCDCDC;
+            border: 1px solid #3A3A4F;
+            border-radius: 5px;
+            font-size: 16px;
+            padding: 5px;
+        }
         QPushButton {
             background-color: #3A3A4F;
             color: #DCDCDC;
@@ -397,7 +405,7 @@ class TrainingInterface(QWidget):
 
     def init_ui(self):
         self.setWindowTitle("YOLO 训练程序")
-        self.resize(1200, 980)
+        self.resize(1200, 1300)
         # Main Layout
         main_layout = QVBoxLayout()
         
@@ -412,10 +420,8 @@ class TrainingInterface(QWidget):
 
         # Training type selection
         train_type_layout = QHBoxLayout()   
-        
         train_type_label = QLabel("模型类型")
         train_type_layout.addWidget(train_type_label)
-        
         self.model_version_combo = QComboBox()
         self.model_version_combo.addItems(
             [
@@ -425,78 +431,80 @@ class TrainingInterface(QWidget):
             ]
         )
         train_type_layout.addWidget(self.model_version_combo)
-              
         main_layout.addLayout(train_type_layout)
         
-        train_task_layout = QHBoxLayout()   
-             
+        train_task_layout = QHBoxLayout()  
         train_type_label = QLabel("训练任务类型")
         train_task_layout.addWidget(train_type_label)
-        
         self.train_type_combo = QComboBox()
         self.train_type_combo.addItems(["多边形Segment训练(分割模型)", "矩形detect训练(检测模型)"])
         train_task_layout.addWidget(self.train_type_combo)
-              
         main_layout.addLayout(train_task_layout)
-
+        
+        train_task_layout = QHBoxLayout() 
+        self.train_from = QCheckBox("使用 JSON 进行训练 (\"开始训练\" 前需手动点击下方 \"一键转换为 YOLO 格式\", 并会自动勾选 \"分配 10% 验证集\")")
+        self.train_from.setChecked(True) 
+        train_task_layout.addWidget(self.train_from)
+        main_layout.addLayout(train_task_layout)
+        
         # File paths
         file_layout = QGridLayout()
-        file_layout.addWidget(QLabel("JSON 标注文件夹路径 (可选):"), 0, 0)
+        file_layout.addWidget(QLabel("JSON 标注文件夹路径:"), 0, 0)
         annotation_path_btn = QPushButton("...")
-        annotation_path_btn.setFixedWidth(50)
+        annotation_path_btn.setFixedWidth(40)
         annotation_path_btn.clicked.connect(self.choose_json_path)
         file_layout.addWidget(self.annotation_path, 0, 1)
         file_layout.addWidget(annotation_path_btn, 0, 2)
 
-        file_layout.addWidget(QLabel("IMAGE 图片文件夹路径 (可选):"), 1, 0)
+        file_layout.addWidget(QLabel("IMAGE 图片文件夹路径:"), 1, 0)
         img_path_btn = QPushButton("...")
-        img_path_btn.setFixedWidth(50)
+        img_path_btn.setFixedWidth(40)
         img_path_btn.clicked.connect(self.choose_img_path)
         file_layout.addWidget(self.img_path, 1, 1)
         file_layout.addWidget(img_path_btn, 1, 2)
 
-        file_layout.addWidget(QLabel("预训练权重路径 (可选):"), 2, 0)
-        pretrained_path_btn = QPushButton('...')
-        pretrained_path_btn.setFixedWidth(50)
-        pretrained_path_btn.clicked.connect(self.choose_pretrained_path)
-        file_layout.addWidget(self.pretrained_path, 2, 1)
-        file_layout.addWidget(pretrained_path_btn, 2, 2)
-
-        file_layout.addWidget(QLabel("训练结果保存路径:"), 3, 0)
-        save_path_btn = QPushButton("...")
-        save_path_btn.setFixedWidth(50)
-        save_path_btn.clicked.connect(self.choose_save_path)
-        if self.img_path.text() != "":
-            self.save_path = QLineEdit(os.path.join("yolo_weights", self.img_path.text()))
-        else:
-            self.save_path = QLineEdit("yolo_weights\\")
-        file_layout.addWidget(self.save_path, 3, 1)
-        file_layout.addWidget(save_path_btn, 3, 2)
-
-        file_layout.addWidget(QLabel("Train 训练集文件夹路径:"), 4, 0)
+        file_layout.addWidget(QLabel("Train 训练集文件夹路径:"), 2, 0)
         train_path_btn = QPushButton("...")
-        train_path_btn.setFixedWidth(50)
+        train_path_btn.setFixedWidth(40)
         train_path_btn.clicked.connect(self.choose_img_path)
-        file_layout.addWidget(self.train_path, 4, 1)
-        file_layout.addWidget(train_path_btn, 4, 2)
+        file_layout.addWidget(self.train_path, 2, 1)
+        file_layout.addWidget(train_path_btn, 2, 2)
 
-        file_layout.addWidget(QLabel("Valid 验证集文件夹路径 (可选):"), 5, 0)
+        file_layout.addWidget(QLabel("Valid 验证集文件夹路径 (可选):"), 3, 0)
         valid_path_btn = QPushButton('...')
-        valid_path_btn.setFixedWidth(50)
+        valid_path_btn.setFixedWidth(40)
         valid_path_btn.clicked.connect(self.choose_pretrained_path)
-        file_layout.addWidget(self.valid_path, 5, 1)
-        file_layout.addWidget(valid_path_btn, 5, 2)
+        file_layout.addWidget(self.valid_path, 3, 1)
+        file_layout.addWidget(valid_path_btn, 3, 2)
 
-        file_layout.addWidget(QLabel("Yaml 数据集配置 (Path, Name) 文件路径:"), 6, 0)
+        file_layout.addWidget(QLabel("Yaml 数据集配置 (Path, Name) 文件路径:"), 4, 0)
         yaml_path_btn = QPushButton('...')
-        yaml_path_btn.setFixedWidth(50)
+        yaml_path_btn.setFixedWidth(40)
         yaml_path_btn.clicked.connect(self.choose_yaml_path)
         if self.img_path.text() != "":
             self.yaml_path = QLineEdit(os.path.join("cfgs", self.img_path+'.yaml'))
         else:
             self.yaml_path = QLineEdit("cfgs\\.yaml")
-        file_layout.addWidget(self.yaml_path, 6, 1)
-        file_layout.addWidget(yaml_path_btn, 6, 2)
+        file_layout.addWidget(self.yaml_path, 4, 1)
+        file_layout.addWidget(yaml_path_btn, 4, 2)
+        
+        file_layout.addWidget(QLabel("预训练权重路径 (可选):"), 5, 0)
+        pretrained_path_btn = QPushButton('...')
+        pretrained_path_btn.setFixedWidth(40)
+        pretrained_path_btn.clicked.connect(self.choose_pretrained_path)
+        file_layout.addWidget(self.pretrained_path, 5, 1)
+        file_layout.addWidget(pretrained_path_btn, 5, 2)
+
+        file_layout.addWidget(QLabel("训练结果保存路径:"), 6, 0)
+        save_path_btn = QPushButton("...")
+        save_path_btn.setFixedWidth(40)
+        save_path_btn.clicked.connect(self.choose_save_path)
+        if self.img_path.text() != "":
+            self.save_path = QLineEdit(os.path.join("yolo_weights", self.img_path.text()))
+        else:
+            self.save_path = QLineEdit("yolo_weights\\")
+        file_layout.addWidget(self.save_path, 6, 1)
+        file_layout.addWidget(save_path_btn, 6, 2)
 
         main_layout.addLayout(file_layout)
 
@@ -563,7 +571,8 @@ class TrainingInterface(QWidget):
         self.p2 = QCheckBox("小目标检测P2增强")
         params_layout.addWidget(self.p2, 4, 0)
         
-        self.val = QCheckBox("自动分配 10% 验证集")
+        self.val = QCheckBox("分配 10% 验证集")
+        self.val.setEnabled(False)
         params_layout.addWidget(self.val, 4, 2)
 
         # self.auto_correct = QCheckBox("自动修正图像格式")
@@ -605,12 +614,12 @@ class TrainingInterface(QWidget):
         params_layout = QGridLayout()
         
         self.generate_labels = QCheckBox("自动为剩余数据生成标注")
-        self.generate_labels.setChecked(True)
+        self.generate_labels.setChecked(False)
         params_layout.addWidget(self.generate_labels, 1, 0)
-        
-        self.generate_labels = QCheckBox("只使用Verified标注数据")
-        self.generate_labels.setChecked(True)
-        params_layout.addWidget(self.generate_labels, 1, 1)
+
+        self.only_verified = QCheckBox("只使用Verified标注数据")
+        self.only_verified.setChecked(True)
+        params_layout.addWidget(self.only_verified, 1, 1)
         
         self.sam = QCheckBox("使用Segmentation模型优化标注 (仅在目标较大时使用)")
         params_layout.addWidget(self.sam, 1, 2)
@@ -637,7 +646,7 @@ class TrainingInterface(QWidget):
         convert_button.clicked.connect(self.convert_to_yolo)
         button_layout.addWidget(convert_button)
 
-        # Buttons        
+        # 开始训练按钮    
         self.train_button = QPushButton("开始训练")
         add_shadow_effect(self.train_button)
         self.train_button.setFont(custom_font)
@@ -658,8 +667,30 @@ class TrainingInterface(QWidget):
             }
         """)
         button_layout.addWidget(self.train_button)
-        
         self.train_button.clicked.connect(self.start_training)
+        
+        # 停止训练按钮
+        self.stop_button = QPushButton("停止训练")
+        add_shadow_effect(self.stop_button)
+        self.stop_button.setFont(custom_font)
+        self.stop_button.setStyleSheet("""
+            QPushButton {
+                background-color: #B22222;
+                color: #fff;
+                border: 1px solid #4A4A5F;
+                border-radius: 8px;
+                padding: 8px 12px;
+            }
+            QPushButton:hover {
+                background-color: #CD5C5C;
+            }
+            QPushButton:pressed {
+                background-color: #8B0000;
+            }
+        """)
+        button_layout.addWidget(self.stop_button)
+        self.stop_button.clicked.connect(self.stop_training)
+        self.stop_button.setEnabled(False)
         
         help_button = QPushButton("说明")
         add_shadow_effect(help_button)
@@ -671,6 +702,56 @@ class TrainingInterface(QWidget):
 
         # Set main layout
         self.setLayout(main_layout)
+        
+        self._annotation_path_btn = annotation_path_btn
+        self._annotation_edit = self.annotation_path
+        self._img_path_btn = img_path_btn
+        self._img_edit = self.img_path
+        self._convert_button = convert_button
+        
+        self._train_path_btn = train_path_btn
+        self._train_path_edit = self.train_path
+        self._valid_path_btn = valid_path_btn
+        self._valid_path_edit = self.valid_path
+        self._yaml_path_btn = yaml_path_btn
+        self._yaml_path_edit = self.yaml_path
+                
+        # 绑定 train_from 状态变化事件
+        self.train_from.stateChanged.connect(self._on_train_from_state_changed)
+        self._on_train_from_state_changed()
+
+    def _on_train_from_state_changed(self):
+        # 按钮视觉反馈
+        btn_disable_style = "background-color: #444; color: #aaa; border: 1px solid #666;"
+        # 文本框视觉反馈
+        edit_disable_style = "background-color: #444; color: #aaa; border: 1px solid #666;"
+        edit_enable_style = "background-color: #2A2A36; color: #DCDCDC; border: 1px solid #3A3A4F; border-radius: 5px;"
+        
+        use_json = self.train_from.isChecked()
+        # self.val.setChecked(use_json)
+        # self.generate_labels.setEnabled(use_json)
+        # self.only_verified.setEnabled(use_json)
+        # self.sam.setEnabled(use_json)
+        # self._convert_button.setEnabled(use_json)
+        
+        for element in [self.val, self.generate_labels, self.only_verified, self.sam, self._convert_button]:
+            element.setEnabled(use_json)
+            # element.setStyleSheet(edit_enable_style if use_json else edit_disable_style)
+            
+        btn_enable_style = ""  # 使用默认样式
+        for btn in [self._train_path_btn, self._valid_path_btn, self._yaml_path_btn]:
+            btn.setEnabled(not use_json)
+            btn.setStyleSheet(btn_disable_style if use_json else btn_enable_style)
+        for btn in [self._annotation_path_btn, self._img_path_btn]:
+            btn.setEnabled(use_json)
+            btn.setStyleSheet(btn_disable_style if not use_json else btn_enable_style)
+
+        for edit in [self._train_path_edit, self._valid_path_edit, self._yaml_path_edit]:
+            edit.setEnabled(not use_json)
+            edit.setStyleSheet(edit_disable_style if use_json else edit_enable_style)
+        for edit in [self._annotation_edit, self._img_edit]:
+            edit.setEnabled(use_json)
+            edit.setStyleSheet(edit_disable_style if not use_json else edit_enable_style)
 
     def closeEvent(self, event):
         """在关闭窗口时释放资源"""
@@ -784,10 +865,14 @@ class TrainingInterface(QWidget):
         self.train_thread.start()
         self.train_button.setEnabled(False)
         self.train_button.setText("正在训练中...")
+        self.stop_button.setEnabled(True)
         
     def stop_training(self):
         """停止训练线程"""
-        self.train_thread.stop()
+        if self.train_thread is not None:
+            self.train_thread.stop()
+            self.update_log("已请求停止训练...请稍候。")
+            self.stop_button.setEnabled(False)
      
      
 def get_gpu_memory():
