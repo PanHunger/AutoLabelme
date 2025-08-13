@@ -9,6 +9,7 @@ import re
 import sys
 import webbrowser
 import textwrap
+from glob import glob
 
 import imgviz
 import natsort
@@ -1018,7 +1019,11 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         ai_prompt_action = QtWidgets.QWidgetAction(self)
         ai_prompt_action.setDefaultWidget(self._ai_prompt_widget)
-
+        # 添加一个显示已标注数据数量的控件
+        self.label_count = QtWidgets.QLabel(self)
+        self.label_count.setText("已标注：0")
+        self.label_count_action = QtWidgets.QWidgetAction(self)
+        self.label_count_action.setDefaultWidget(self.label_count)
         # 主界面的工具栏
         self.tools = self.toolbar("Tools")
         self.actions.tool = (
@@ -1046,6 +1051,9 @@ class MainWindow(QtWidgets.QMainWindow):
             selectAiModel,
             None,
             ai_prompt_action,
+            None,
+            self.label_count_action,
+            None
         )
 
         self.statusBar().showMessage(str(self.tr("%s started.")) % __appname__)
@@ -1687,6 +1695,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 items[0].setCheckState(Qt.Checked)
             # disable allows next and previous image to proceed
             # self.filename = filename
+            from glob import glob
+            label_img_num = len(glob(os.path.join(os.path.dirname(self.imagePath), '**', '*.json'), recursive=True))
+            self.label_count.setText("已标注：{}".format(label_img_num))
             return True
         except LabelFileError as e:
             self.errorMessage(
@@ -1992,6 +2003,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.status(str(self.tr("Loaded %s")) % osp.basename(str(filename)))
         self.filePath = filename
         self.defaultSaveDir = osp.dirname(filename)
+        from glob import glob
+        label_img_num = len(glob(os.path.join(os.path.dirname(self.imagePath), '**', '*.json'), recursive=True))
+        self.label_count.setText("已标注：{}".format(label_img_num))
         return True
 
     def resizeEvent(self, event):
