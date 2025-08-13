@@ -11,7 +11,7 @@ names:
   9: person
   10: potted plant
   11: dog
-path: E:\PycharmProjects\yolov8_datasets\coco8
+path: E:/PycharmProjects/yolov8_datasets/coco8
 test:
-train: images\1
-val: images\1
+train: images/1
+val: images/1

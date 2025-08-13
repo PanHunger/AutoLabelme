@@ -1,0 +1,6 @@
+names:
+  0: cottonTop
+path: E:/Projects/PycharmProjects/2-YoloSeries/yolov8_datasets
+test:
+train: images/20250813_cotton_top1
+val: images/20250813_cotton_top1

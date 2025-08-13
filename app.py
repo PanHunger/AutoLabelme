@@ -2487,7 +2487,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 QMessageBox.information(self, u'Wrong!', u'have no loaded folder yet, please check again.')
                 self.training_window = TrainingInterface("", "", "")
             else:
-                self.training_window = TrainingInterface(img_path=os.path.dirname(self.filePath), annotation_path=self.defaultSaveDir)
+                self.training_window = TrainingInterface(
+                    img_path=os.path.dirname(self.filePath), 
+                    annotation_path=self.defaultSaveDir
+                    )
             # set_dark_theme(self.training_window)
             # apply_stylesheet(self.training_window)
             font = QFont("微软雅黑", 10)  # 字体名称为微软雅黑，大小为 16

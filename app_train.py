@@ -37,6 +37,7 @@ import datetime
 from glob import glob
 from tqdm import tqdm
 import numpy as np
+from pathlib import Path
 
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QColor, QPalette
@@ -367,9 +368,9 @@ class CustomTitleBar(QWidget):
 class TrainingInterface(QWidget):
     def __init__(self, img_path=None, annotation_path=None, pretrained_path=None):
         super().__init__()
-        self.img_path = QLineEdit(img_path)
-        self.annotation_path = QLineEdit(annotation_path)
-        self.pretrained_path = QLineEdit(pretrained_path)
+        self.img_path = QLineEdit(img_path if img_path is None else img_path.replace('\\', '/'))
+        self.annotation_path = QLineEdit(annotation_path if annotation_path is None else annotation_path.replace('\\', '/'))
+        self.pretrained_path = QLineEdit(pretrained_path if pretrained_path is None else pretrained_path.replace('\\', '/'))
         self.train_path = QLineEdit()
         self.valid_path = QLineEdit()
         self.yaml_path = QLineEdit()
@@ -381,31 +382,33 @@ class TrainingInterface(QWidget):
     def choose_json_path(self):
         path = QFileDialog.getExistingDirectory(self, '选择 JSON 标注文件夹路径', '')
         if path:
-            self.annotation_path.setText(path)
+            self.annotation_path.setText(path.replace('\\', '/'))
 
     def choose_img_path(self):
         path = QFileDialog.getExistingDirectory(self, '选择 IMAGE 图片文件夹路径', '')
         if path:
-            self.img_path.setText(path)
+            self.img_path.setText(path.replace('\\', '/'))
             
     def choose_save_path(self):
         path = QFileDialog.getExistingDirectory(self, '选择训练结果保存文件夹路径', '')
         if path:
-            self.img_path.setText(path)
+            self.img_path.setText(path.replace('\\', '/'))
 
     def choose_pretrained_path(self):
         path, _ = QFileDialog.getOpenFileName(self, '选择预训练 pt 文件', '', 'pt 文件 (*.pt);;所有文件 (*)')
         if path:
-            self.pretrained_path.setText(path)
+            self.pretrained_path.setText(path.replace('\\', '/'))
 
     def choose_yaml_path(self):
         path, _ = QFileDialog.getOpenFileName(self, '选择数据集配置 yaml 文件', '', 'yaml 文件 (*.yaml);;所有文件 (*)')
         if path:
             self.yaml_path.setText(path)
+            # 自动调用 yaml 解析并更新 UI
+            self.update_train_and_val_folder_from_yaml(path.replace('\\', '/'))
 
     def init_ui(self):
         self.setWindowTitle("YOLO 训练程序")
-        self.resize(1200, 1300)
+        self.resize(1650, 1300)
         # Main Layout
         main_layout = QVBoxLayout()
         
@@ -462,31 +465,34 @@ class TrainingInterface(QWidget):
         img_path_btn.clicked.connect(self.choose_img_path)
         file_layout.addWidget(self.img_path, 1, 1)
         file_layout.addWidget(img_path_btn, 1, 2)
-
-        file_layout.addWidget(QLabel("Train 训练集文件夹路径:"), 2, 0)
-        train_path_btn = QPushButton("...")
-        train_path_btn.setFixedWidth(40)
-        train_path_btn.clicked.connect(self.choose_img_path)
-        file_layout.addWidget(self.train_path, 2, 1)
-        file_layout.addWidget(train_path_btn, 2, 2)
-
-        file_layout.addWidget(QLabel("Valid 验证集文件夹路径 (可选):"), 3, 0)
-        valid_path_btn = QPushButton('...')
-        valid_path_btn.setFixedWidth(40)
-        valid_path_btn.clicked.connect(self.choose_pretrained_path)
-        file_layout.addWidget(self.valid_path, 3, 1)
-        file_layout.addWidget(valid_path_btn, 3, 2)
-
-        file_layout.addWidget(QLabel("Yaml 数据集配置 (Path, Name) 文件路径:"), 4, 0)
+        
+        file_layout.addWidget(QLabel("Yaml 数据集配置文件路径:"), 2, 0)
         yaml_path_btn = QPushButton('...')
         yaml_path_btn.setFixedWidth(40)
         yaml_path_btn.clicked.connect(self.choose_yaml_path)
         if self.img_path.text() != "":
-            self.yaml_path = QLineEdit(os.path.join("cfgs", self.img_path+'.yaml'))
+            self.yaml_path = QLineEdit(
+                os.path.normpath(os.path.join(self.img_path.text(), 
+                             f'{os.path.basename(self.img_path.text())}.yaml')).replace("\\", "/")
+                )
         else:
-            self.yaml_path = QLineEdit("cfgs\\.yaml")
-        file_layout.addWidget(self.yaml_path, 4, 1)
-        file_layout.addWidget(yaml_path_btn, 4, 2)
+            self.yaml_path = QLineEdit("cfgs/.yaml")
+        file_layout.addWidget(self.yaml_path, 2, 1)
+        file_layout.addWidget(yaml_path_btn, 2, 2)
+
+        file_layout.addWidget(QLabel("Train 训练集文件夹路径:"), 3, 0)
+        # train_path_btn = QPushButton("...")
+        # train_path_btn.setFixedWidth(40)
+        # train_path_btn.clicked.connect(self.choose_img_path)
+        file_layout.addWidget(self.train_path, 3, 1)
+        # file_layout.addWidget(train_path_btn, 3, 2)
+
+        file_layout.addWidget(QLabel("Valid 验证集文件夹路径:"), 4, 0)
+        # valid_path_btn = QPushButton('...')
+        # valid_path_btn.setFixedWidth(40)
+        # valid_path_btn.clicked.connect(self.choose_pretrained_path)
+        file_layout.addWidget(self.valid_path, 4, 1)
+        # file_layout.addWidget(valid_path_btn, 4, 2)
         
         file_layout.addWidget(QLabel("预训练权重路径 (可选):"), 5, 0)
         pretrained_path_btn = QPushButton('...')
@@ -500,9 +506,9 @@ class TrainingInterface(QWidget):
         save_path_btn.setFixedWidth(40)
         save_path_btn.clicked.connect(self.choose_save_path)
         if self.img_path.text() != "":
-            self.save_path = QLineEdit(os.path.join("yolo_weights", self.img_path.text()))
+            self.save_path = QLineEdit(os.path.join("yolo_weights", os.path.basename(self.img_path.text())))
         else:
-            self.save_path = QLineEdit("yolo_weights\\")
+            self.save_path = QLineEdit("yolo_weights/")
         file_layout.addWidget(self.save_path, 6, 1)
         file_layout.addWidget(save_path_btn, 6, 2)
 
@@ -569,11 +575,21 @@ class TrainingInterface(QWidget):
         params_layout.addLayout(size_layout, 3, 1, 1, 3)
 
         self.p2 = QCheckBox("小目标检测P2增强")
-        params_layout.addWidget(self.p2, 4, 0)
+        params_layout.addWidget(self.p2, 4, 3)
         
-        self.val = QCheckBox("分配 10% 验证集")
+        self.val = QCheckBox("分配验证集比例")
         self.val.setEnabled(False)
-        params_layout.addWidget(self.val, 4, 2)
+        params_layout.addWidget(self.val, 4, 0)
+        
+        self.val_ratio = QDoubleSpinBox()
+        self.val_ratio.setRange(0.0, 1.0)
+        self.val_ratio.setValue(0.1)
+        self.val_ratio.setSingleStep(0.01)
+        params_layout.addWidget(self.val_ratio, 4, 1)
+        
+        self.generate_negative_samples = QCheckBox("生成负样本")
+        self.generate_negative_samples.setChecked(False)
+        params_layout.addWidget(self.generate_negative_samples, 4, 2)
 
         # self.auto_correct = QCheckBox("自动修正图像格式")
         # params_layout.addWidget(self.auto_correct, 4, 2)
@@ -643,7 +659,7 @@ class TrainingInterface(QWidget):
         convert_button = QPushButton("一键转换为 YOLO 格式")
         add_shadow_effect(convert_button)
         convert_button.setFont(custom_font)
-        convert_button.clicked.connect(self.convert_to_yolo)
+        convert_button.clicked.connect(self.auto_convert_to_yolo)
         button_layout.addWidget(convert_button)
 
         # 开始训练按钮    
@@ -709,9 +725,9 @@ class TrainingInterface(QWidget):
         self._img_edit = self.img_path
         self._convert_button = convert_button
         
-        self._train_path_btn = train_path_btn
+        # self._train_path_btn = train_path_btn
         self._train_path_edit = self.train_path
-        self._valid_path_btn = valid_path_btn
+        # self._valid_path_btn = valid_path_btn
         self._valid_path_edit = self.valid_path
         self._yaml_path_btn = yaml_path_btn
         self._yaml_path_edit = self.yaml_path
@@ -734,25 +750,38 @@ class TrainingInterface(QWidget):
         # self.sam.setEnabled(use_json)
         # self._convert_button.setEnabled(use_json)
         
-        for element in [self.val, self.generate_labels, self.only_verified, self.sam, self._convert_button]:
+        for element in [self.val, self.generate_negative_samples, self.generate_labels, self.only_verified, self.sam, self._convert_button]:
             element.setEnabled(use_json)
             # element.setStyleSheet(edit_enable_style if use_json else edit_disable_style)
             
         btn_enable_style = ""  # 使用默认样式
-        for btn in [self._train_path_btn, self._valid_path_btn, self._yaml_path_btn]:
-            btn.setEnabled(not use_json)
-            btn.setStyleSheet(btn_disable_style if use_json else btn_enable_style)
+        # for btn in [
+        #     # self._train_path_btn, 
+        #     # self._valid_path_btn, 
+        #     self._yaml_path_btn]:
+        #     btn.setEnabled(not use_json)
+        #     # btn.setStyleSheet(btn_disable_style if use_json else btn_enable_style)
         for btn in [self._annotation_path_btn, self._img_path_btn]:
             btn.setEnabled(use_json)
-            btn.setStyleSheet(btn_disable_style if not use_json else btn_enable_style)
+            # btn.setStyleSheet(btn_disable_style if not use_json else btn_enable_style)
 
-        for edit in [self._train_path_edit, self._valid_path_edit, self._yaml_path_edit]:
-            edit.setEnabled(not use_json)
-            edit.setStyleSheet(edit_disable_style if use_json else edit_enable_style)
+        # for edit in [
+        #     # self._train_path_edit, 
+        #     # self._valid_path_edit, 
+        #     self._yaml_path_edit]:
+        #     edit.setEnabled(not use_json)
+        #     # edit.setStyleSheet(edit_disable_style if use_json else edit_enable_style)
         for edit in [self._annotation_edit, self._img_edit]:
             edit.setEnabled(use_json)
-            edit.setStyleSheet(edit_disable_style if not use_json else edit_enable_style)
-
+            # edit.setStyleSheet(edit_disable_style if not use_json else edit_enable_style)
+            
+        self._train_path_edit.setEnabled(False)
+        # self._train_path_edit.setStyleSheet(edit_disable_style)
+        self._valid_path_edit.setEnabled(False)
+        # self._valid_path_edit.setStyleSheet(edit_disable_style)
+        # self._train_path_btn.setEnabled(False) 
+        # self._valid_path_btn.setEnabled(False) 
+ 
     def closeEvent(self, event):
         """在关闭窗口时释放资源"""
         print("TrainingInterface 窗口正在关闭...")
@@ -787,9 +816,339 @@ class TrainingInterface(QWidget):
         print("清理 TrainingInterface 的临时变量...")
         # 示例：self.training_process.terminate()
         # 示例：del self.some_temp_data
+    
+    def find_unique_labels_in_directory(self, directory_path):
+        """
+        在指定文件夹中查找所有独一无二的label标签。
+        """
+        def extract_labels_from_json(file_path):
+            """
+            从单个JSON文件中提取所有label字段。
+            """
+            labels = set()
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    if 'shapes' in data:
+                        for shape in data['shapes']:
+                            if 'label' in shape:
+                                labels.add(shape['label'])
+            except json.JSONDecodeError:
+                print(f"Error decoding JSON file: {file_path}")
+            return labels
+        
+        unique_labels = set()
+        for root, dirs, files in os.walk(directory_path):
+            for file in files:
+                if file.endswith('.json'):
+                    file_path = os.path.join(root, file)
+                    labels = extract_labels_from_json(file_path)
+                    unique_labels.update(labels)
+        # 如果需要将结果存储为字典，键和值可以相同
+        labels_dict = {label: i for i, label in enumerate(unique_labels)}
+        return unique_labels, labels_dict
+    
+    def convert_json2txt(self, anno_dir, image_dir, class_map):
+        # sub_folders = os.listdir(anno_dir)
+        # sub_folders = [f for f in Path(anno_dir).iterdir() if f.is_dir()]
+        sub_folders = []
+        for item in os.listdir(anno_dir):
+            if os.path.isdir(os.path.join(anno_dir, item)):
+                sub_folders.append(item)
+        sub_folders.append("")
 
-    def convert_to_yolo(self):
-        pass
+        for sub_folder in sub_folders:
+            if sub_folder in ["images", "labels"]:
+                continue
+            source_path = anno_dir if sub_folder == "" else anno_dir + '/' + sub_folder
+            dest_path = source_path
+            # print(dest_path)
+            # if not os.path.exists(dest_path):
+            #     os.makedirs(dest_path)
+            #     print(f"标注目录{dest_path}不存在，已创建目录")
+                
+            filenames = set(os.listdir(source_path))
+            filenames = [fn for fn in filenames if fn.endswith((".jpg", ".bmp", ".png", ".tif", ".jpeg", ".gif", ".webp"))]  # 确保只选择 json 文件 
+            filenames.sort()
+
+            for i, filename in enumerate(filenames[:]):
+                
+                # 为没有标注的图像生成标签（负样本）
+                if not os.path.exists(os.path.join(source_path, filename.split('.')[0] + '.json')):
+                    if self.generate_negative_samples.isChecked():
+                        with open(os.path.join(dest_path, filename.split('.')[0] + '.txt'), 'w') as f:
+                            pass
+                    continue
+                    
+                # 读取标注数据  
+                with open(os.path.join(source_path, filename.split('.')[0] + '.json'), 'r') as f:  
+                    annotation = json.load(f)  
+                
+                # 获取图片路径  
+                image_path = annotation['imagePath']
+                # 获取标注形状  
+                shapes = annotation['shapes']  
+                h = annotation['imageHeight']
+                w = annotation['imageWidth']
+                wh = np.array([w, h])
+                
+                with open(os.path.join(dest_path, filename.split('.')[0] + '.txt'), 'w') as f:
+                
+                    # 遍历所有形状并绘制多边形 
+                    for shape in shapes:  
+                        if shape['shape_type'] == 'polygon': # 多边形
+                            if self.train_type_combo.currentText() == "多边形Segment训练(分割模型)":
+                                points = np.array(shape['points'], dtype=np.int32)  
+                                points = points.reshape((-1, 2))  # 将点转换为可以规范化的格式  
+                                normalized_points = points / wh
+                                normalized_points = normalized_points.flatten()
+                                f.write(f'{class_map[shape["label"]]} ')
+                                for p in normalized_points:
+                                    f.write(f'{p} ')
+                                f.write('\n')
+                            elif self.train_type_combo.currentText() == "矩形detect训练(检测模型)":
+                                points = np.array(shape['points'], dtype=np.int32)  
+                                points = points.reshape((-1, 2))  # 将点转换为可以规范化的格式  
+                                normalized_points = points / wh
+                                # 将多边形转换成 x_center, yx_center, w, h
+                                x = normalized_points[:, 0].mean()
+                                y = normalized_points[:, 1].mean()
+                                w = normalized_points[:, 0].max() - normalized_points[:, 0].min()
+                                h = normalized_points[:, 1].max() - normalized_points[:, 1].min()
+                                f.write(f'{class_map[shape["label"]]} {x} {y} {w} {h}\n')
+                        if shape['shape_type'] == 'rectangle': # 矩形
+                            points = np.array(shape['points'], dtype=np.int32)
+                            points = points.reshape((-1, 2))  # 将点转换为可以规范化的格式 
+                            normalized_points = points / wh
+                            x1, y1, x2, y2 = normalized_points[0][0], normalized_points[0][1], normalized_points[1][0], normalized_points[1][1]
+                            # 将 x1, y1, x2, y2 转换成 x_center, yx_center, w, h
+                            x, y, w, h = (x1 + x2) / 2, (y1 + y2) / 2, max(x1, x2) - min(x1, x2), max(y1, y2) - min(y1, y2)
+                            f.write(f'{class_map[shape["label"]]} {x} {y} {w} {h}\n')
+                        if shape['shape_type'] == 'circle':  # 圆形
+                            points = np.array(shape['points'], dtype=np.int32)  
+                            points = points.reshape((-1, 2))  # 将点转换为可以规范化的格式  
+                            normalized_points = points / wh
+                            normalized_points = normalized_points.flatten()
+                            f.write(f'{class_map[shape["label"]]} ')
+                            for p in normalized_points:
+                                f.write(f'{p} ')
+                            f.write('\n')
+                        if shape['shape_type'] == 'line':  # 直线
+                            points = np.array(shape['points'], dtype=np.int32)  
+                            points = points.reshape((-1, 2))  # 将点转换为可以规范化的格式  
+                            normalized_points = points / wh
+                            normalized_points = normalized_points.flatten()
+                            f.write(f'{class_map[shape["label"]]} ')
+                            for p in normalized_points:
+                                f.write(f'{p} ')
+                            f.write('\n')
+                        if shape['shape_type'] == 'linestrip': # 折线
+                            points = np.array(shape['points'], dtype=np.int32)  
+                            points = points.reshape((-1, 2))  # 将点转换为可以规范化的格式  
+                            normalized_points = points / wh
+                            normalized_points = normalized_points.flatten()
+                            f.write(f'{class_map[shape["label"]]} ')
+                            for p in normalized_points:
+                                f.write(f'{p} ')
+                            f.write('\n')
+        
+    def split_train_val(self, data_path, val_ratio=0.1, remove_exist=False):
+
+        # 在 data_path 目录中根据 val_ratio 比例，创建 yolo 格式的训练文件夹和验证文件夹
+        train_image_path = data_path + '/images/train'
+        train_label_path = data_path + '/labels/train'
+        val_image_path =   data_path + '/images/valid'
+        val_label_path =   data_path + '/labels/valid'
+        
+        # 定义数据集路径和划分后的保存路径
+        root_path = data_path  # 原始数据集路径
+
+        print("data_path: ", data_path)
+        print("root_path: ", root_path)
+        print("images_path: ", train_image_path)
+        print("labels_path: ", train_label_path)
+        print("images_path: ", val_image_path)
+        print("labels_path: ", val_label_path)
+
+        # 创建划分后的目录结构
+        if remove_exist:
+            if os.path.exists(train_image_path):
+                shutil.rmtree(train_image_path)
+            if os.path.exists(train_label_path):
+                shutil.rmtree(train_label_path)
+            if os.path.exists(val_image_path):
+                shutil.rmtree(val_image_path)
+            if os.path.exists(val_label_path):
+                shutil.rmtree(val_label_path)
+            
+        os.makedirs(train_image_path, exist_ok=False)
+        os.makedirs(train_label_path, exist_ok=False)
+        os.makedirs(val_image_path, exist_ok=False)
+        os.makedirs(val_label_path, exist_ok=False)
+            
+        # 获取所有有标注图片文件的文件名
+        label_files = []  # 假设标注文件格式为 txt
+        image_files = []  # 假设图片格式为 jpg
+        
+        sub_folders = []
+        for item in os.listdir(root_path):
+            if os.path.isdir(os.path.join(root_path, item)):
+                sub_folders.append(item)
+        sub_folders.append("")
+
+        for sub_folder in sub_folders:
+            if sub_folder in ["images", "labels"]:
+                continue
+            source_path = root_path if sub_folder == "" else root_path + '/' + sub_folder
+            for f in os.listdir(source_path):
+                if f.endswith(".txt"):
+                    label_files.append(os.path.join(source_path, f))
+                elif f.endswith((".jpg", ".bmp", ".png", ".tif", ".jpeg", ".gif", ".webp")):
+                    image_files.append(os.path.join(source_path, f))
+            
+            # image_files += [os.path.join(source_path, f) for f in os.listdir(source_path) if f.endswith(".jpg", ".bmp", ".png")]
+            # label_files += [os.path.join(source_path, f) for f in os.listdir(source_path) if f.endswith(".txt")]
+        
+        # print("label_files: ", label_files)
+        # print("image_files: ", image_files)
+        
+        # 随机打乱文件列表
+        combined = list(zip(image_files, label_files))
+        random.shuffle(combined)
+
+        # 定义划分比例（例如，90%用于训练，10%用于验证）
+        train_ratio = 1 - val_ratio
+        train_size = int(train_ratio * len(combined))
+
+        # 划分数据集
+        train_data = combined[:train_size]
+        val_data = combined[train_size:]
+
+        # 复制文件到相应的目录
+        for img_file, label_file in train_data:
+            # print(os.path.join(images_path, img_file), os.path.join(root_path, 'images/train', img_file))
+            shutil.copy(img_file, os.path.join(root_path, 'images/train', os.path.basename(img_file)))
+            # print(os.path.join(labels_path, label_file), os.path.join(root_path, 'labels/train', label_file))
+            shutil.copy(label_file, os.path.join(root_path, 'labels/train', os.path.basename(label_file)))
+
+        if val_ratio > 0:
+            for img_file, label_file in val_data:
+                # print(os.path.join(images_path, img_file), os.path.join(root_path, 'images/val', img_file))
+                shutil.copy(img_file, os.path.join(root_path, 'images/valid', os.path.basename(img_file)))
+                # print(os.path.join(labels_path, label_file), os.path.join(root_path, 'labels/val', label_file))
+                shutil.copy(label_file, os.path.join(root_path, 'labels/valid', os.path.basename(label_file)))
+            return 'images/train', 'images/valid'
+        else:
+            return 'images/train', 'images/train'
+
+    def generate_dataset_yaml(self, dataset_path, train_folder, val_folder, labels_dict, output_file):
+        """
+        生成符合指定格式的数据集 YAML 文件。
+        
+        Args:
+            dataset_path (str): 数据集根路径。
+            train_folder (str): 训练图片文件夹（相对于 dataset_path 的相对路径）。
+            val_folder (str): 验证图片文件夹（相对于 dataset_path 的相对路径）。
+            labels_dict (dict): 类别名称字典，键是类别索引，值是类别名称。
+            output_file (str): 输出 YAML 文件路径。
+        """
+        # 构造数据集配置信息
+        
+        labels_dict_reverse = {v: k for k, v in labels_dict.items()}
+        
+        dataset_config = {
+            "path": dataset_path,
+            "train": train_folder,
+            "val": val_folder,
+            "test": None,
+            "names": labels_dict_reverse
+        }
+
+        # 自定义的 YAML 转换函数，确保符合您需要的格式
+        def yaml_represent_none(self, _):
+            return self.represent_scalar('tag:yaml.org,2002:null', '')
+
+        yaml.add_representer(type(None), yaml_represent_none)  # 确保空值写作空字符串
+
+        # 写入 YAML 文件
+        with open(output_file, "w", encoding="utf-8") as f:
+            yaml.dump(
+                dataset_config, 
+                f, 
+                default_flow_style=False,  # 禁止使用大括号 {}
+                allow_unicode=True         # 支持中文等特殊字符
+            )
+
+        self.update_log(f"数据集 YAML 配置文件已成功保存到 {output_file}！")
+
+    def auto_convert_to_yolo(self):
+        self.update_progress(0)
+        self.update_log("将 Labelme 的 JSON 标注转换成 YOLO 的 txt 标注...")
+        # 获取所有标签
+        unique_labels, labels_dict = self.find_unique_labels_in_directory(self.annotation_path.text())
+        print("唯一标签: ", unique_labels)
+        print("标签字典: ", labels_dict)
+        self.update_progress(20)
+        if len(unique_labels) > 1:
+            needed_labels = None
+            while needed_labels is None:
+                # 提取 names 部分的内容并放入字典中   
+                needed_labels = easygui.multchoicebox(msg="请选择你需要的标签...?", title="选择标签", choices=tuple(unique_labels,))               
+                if needed_labels == None:
+                    self.update_log("重新选择标签...")
+        else:
+            self.update_log("此数据集中仅有 <1> 个标签! 不需要选择标签!")
+        self.update_progress(40)
+        # 将 json 文件转换为 txt 文件
+        self.convert_json2txt(anno_dir=self.annotation_path.text(), 
+                              image_dir=self.img_path.text(), 
+                              class_map=labels_dict)
+        # cfg_path = os.path.join("./cfgs", f"{os.path.basename(self.save_path.text())}.yaml")
+        
+        self.update_progress(60)
+        
+        train_folder, val_folder = self.split_train_val(self.img_path.text(), 
+                                                        self.val_ratio.value() if self.val.isChecked() else 0.0,
+                                                        remove_exist=True)
+        self.update_log(f"训练集路径: {train_folder}")
+        self.update_log(f"验证集路径: {val_folder}")
+        self.update_progress(80)
+        self.generate_dataset_yaml(dataset_path=self.img_path.text(),
+                                   train_folder=train_folder,
+                                   val_folder=val_folder,  # 没有验证集
+                                   labels_dict=labels_dict,
+                                   output_file=self.yaml_path.text())
+        self.update_train_and_val_folder_from_yaml(self.yaml_path.text())
+        self.update_progress(100)
+        self.update_log("成功加载数据!")
+        
+    def update_train_and_val_folder_from_yaml(self, yaml_file_path):
+        """
+        读取yaml文件，解析train/val路径，并更新UI的train_path/valid_path/yaml_path显示内容。
+        """
+        import yaml
+        import os
+        if not os.path.exists(yaml_file_path):
+            self.update_log(f"找不到yaml文件: {yaml_file_path}")
+            return
+        try:
+            with open(yaml_file_path, 'r', encoding='utf-8') as f:
+                data = yaml.safe_load(f)
+            # 解析根路径和 train/val 相对路径
+            base_path = data.get('path', '')
+            train_rel = data.get('train', '')
+            val_rel = data.get('val', '')
+            # 组合成绝对路径
+            train_abs = os.path.normpath(os.path.join(base_path, train_rel)).replace('\\', '/') if base_path and train_rel else train_rel.replace('\\', '/')
+            val_abs = os.path.normpath(os.path.join(base_path, val_rel)).replace('\\', '/') if base_path and val_rel else val_rel.replace('\\', '/')
+            # 更新 UI
+            self.train_path.setText(train_abs)
+            self.valid_path.setText(val_abs)
+            self.yaml_path.setText(yaml_file_path)
+            self.update_log(f"已从yaml加载训练集路径: {train_abs}")
+            self.update_log(f"已从yaml加载验证集路径: {val_abs}")
+        except Exception as e:
+            self.update_log(f"解析yaml文件失败: {e}")
 
     def show_help_dialog(self):
         help_dialog = HelpDialog()
@@ -806,8 +1165,8 @@ class TrainingInterface(QWidget):
     def start_training(self):
                
         """启动训练任务"""
-        if self.annotation_path.text() == "" or self.img_path.text() == "":
-            return QMessageBox.critical(self, "错误", "请填写标注文件夹路径和图片文件夹路径！")
+        if self.train_path.text() == "" or self.valid_path.text() == "":
+            return QMessageBox.critical(self, "错误", "请填写训练集路径和验证集（可选）路径！")
             
         if self.size_n.isChecked():
             model_type = "n"
@@ -935,8 +1294,8 @@ class TrainThread(QThread):
             sub_folders = [""]
 
         for sub_folder in sub_folders:
-            source_path = anno_dir + '\\' + sub_folder
-            dest_path = image_dir.replace("images", "labels") + "\\" + sub_folder
+            source_path = anno_dir + '/' + sub_folder
+            dest_path = image_dir.replace("images", "labels") + "/" + sub_folder
             # print(dest_path)
             if not os.path.exists(dest_path):
                 os.makedirs(dest_path)
@@ -1014,6 +1373,67 @@ class TrainThread(QThread):
                             for p in normalized_points:
                                 f.write(f'{p} ')
                             f.write('\n')
+        
+    def split_train_val(self, data_path, val_ratio=0.1):
+
+        # 定义数据集路径和划分后的保存路径
+        root_path = os.path.dirname(os.path.dirname(data_path))  # 原始数据集路径
+    
+        images_path = data_path
+        labels_path = data_path.replace("images", "labels")
+
+        # print("data_path: ", data_path)
+        # print("root_path: ", root_path)
+        # print("images_path: ", images_path)
+        # print("labels_path: ", labels_path)
+
+        # 创建划分后的目录结构
+        if os.path.exists(os.path.join(root_path, 'images/train')):
+            shutil.rmtree(os.path.join(root_path, 'images/train'))
+        if os.path.exists(os.path.join(root_path, 'labels/train')):
+            shutil.rmtree(os.path.join(root_path, 'labels/train'))
+        if os.path.exists(os.path.join(root_path, 'images/val')):
+            shutil.rmtree(os.path.join(root_path, 'images/val'))
+        if os.path.exists(os.path.join(root_path, 'labels/val')):
+            shutil.rmtree(os.path.join(root_path, 'labels/val'))
+        os.makedirs(os.path.join(root_path, 'images/train'), exist_ok=False)
+        os.makedirs(os.path.join(root_path, 'labels/train'), exist_ok=False)
+        os.makedirs(os.path.join(root_path, 'images/val'), exist_ok=False)
+        os.makedirs(os.path.join(root_path, 'labels/val'), exist_ok=False)
+
+        # 获取所有有标注图片文件的文件名
+        label_files = [f for f in os.listdir(labels_path) if f.endswith('.txt')]  # 假设标注文件格式为 txt
+        image_files = [f.replace('.txt', '.jpg') for f in label_files]  # 假设图片格式为 jpg
+        
+        # print("label_files: ", label_files)
+        # print("image_files: ", image_files)
+        
+        # 随机打乱文件列表
+        combined = list(zip(image_files, label_files))
+        random.shuffle(combined)
+
+        # 定义划分比例（例如，90%用于训练，10%用于验证）
+        train_ratio = 1 - val_ratio
+        train_size = int(train_ratio * len(combined))
+
+        # 划分数据集
+        train_data = combined[:train_size]
+        val_data = combined[train_size:]
+
+        # 复制文件到相应的目录
+        for img_file, label_file in train_data:
+            # print(os.path.join(images_path, img_file), os.path.join(root_path, 'images/train', img_file))
+            shutil.copy(os.path.join(images_path, img_file), os.path.join(root_path, 'images/train', img_file))
+            # print(os.path.join(labels_path, label_file), os.path.join(root_path, 'labels/train', label_file))
+            shutil.copy(os.path.join(labels_path, label_file), os.path.join(root_path, 'labels/train', label_file))
+
+        for img_file, label_file in val_data:
+            print(os.path.join(images_path, img_file), os.path.join(root_path, 'images/val', img_file))
+            shutil.copy(os.path.join(images_path, img_file), os.path.join(root_path, 'images/val', img_file))
+            print(os.path.join(labels_path, label_file), os.path.join(root_path, 'labels/val', label_file))
+            shutil.copy(os.path.join(labels_path, label_file), os.path.join(root_path, 'labels/val', label_file))
+            
+        return 'images/train', 'images/val'
 
     def generate_dataset_yaml(self, dataset_path, train_folder, val_folder, labels_dict, output_file):
         """
@@ -1054,67 +1474,6 @@ class TrainThread(QThread):
             )
 
         print(f"数据集 YAML 配置文件已成功保存到 {output_file}！")
-        
-    def split_train_val(self, data_path, val_ratio=0.1):
-
-        # 定义数据集路径和划分后的保存路径
-        root_path = os.path.dirname(os.path.dirname(data_path))  # 原始数据集路径
-    
-        images_path = data_path
-        labels_path = data_path.replace("images", "labels")
-
-        # print("data_path: ", data_path)
-        # print("root_path: ", root_path)
-        # print("images_path: ", images_path)
-        # print("labels_path: ", labels_path)
-
-        # 创建划分后的目录结构
-        if os.path.exists(os.path.join(root_path, 'images\\train')):
-            shutil.rmtree(os.path.join(root_path, 'images\\train'))
-        if os.path.exists(os.path.join(root_path, 'labels\\train')):
-            shutil.rmtree(os.path.join(root_path, 'labels\\train'))
-        if os.path.exists(os.path.join(root_path, 'images\\val')):
-            shutil.rmtree(os.path.join(root_path, 'images\\val'))
-        if os.path.exists(os.path.join(root_path, 'labels\\val')):
-            shutil.rmtree(os.path.join(root_path, 'labels\\val'))
-        os.makedirs(os.path.join(root_path, 'images\\train'), exist_ok=False)
-        os.makedirs(os.path.join(root_path, 'labels\\train'), exist_ok=False)
-        os.makedirs(os.path.join(root_path, 'images\\val'), exist_ok=False)
-        os.makedirs(os.path.join(root_path, 'labels\\val'), exist_ok=False)
-
-        # 获取所有有标注图片文件的文件名
-        label_files = [f for f in os.listdir(labels_path) if f.endswith('.txt')]  # 假设标注文件格式为 txt
-        image_files = [f.replace('.txt', '.jpg') for f in label_files]  # 假设图片格式为 jpg
-        
-        # print("label_files: ", label_files)
-        # print("image_files: ", image_files)
-        
-        # 随机打乱文件列表
-        combined = list(zip(image_files, label_files))
-        random.shuffle(combined)
-
-        # 定义划分比例（例如，90%用于训练，10%用于验证）
-        train_ratio = 1 - val_ratio
-        train_size = int(train_ratio * len(combined))
-
-        # 划分数据集
-        train_data = combined[:train_size]
-        val_data = combined[train_size:]
-
-        # 复制文件到相应的目录
-        for img_file, label_file in train_data:
-            # print(os.path.join(images_path, img_file), os.path.join(root_path, 'images\\train', img_file))
-            shutil.copy(os.path.join(images_path, img_file), os.path.join(root_path, 'images\\train', img_file))
-            # print(os.path.join(labels_path, label_file), os.path.join(root_path, 'labels\\train', label_file))
-            shutil.copy(os.path.join(labels_path, label_file), os.path.join(root_path, 'labels\\train', label_file))
-
-        for img_file, label_file in val_data:
-            print(os.path.join(images_path, img_file), os.path.join(root_path, 'images\\val', img_file))
-            shutil.copy(os.path.join(images_path, img_file), os.path.join(root_path, 'images\\val', img_file))
-            print(os.path.join(labels_path, label_file), os.path.join(root_path, 'labels\\val', label_file))
-            shutil.copy(os.path.join(labels_path, label_file), os.path.join(root_path, 'labels\\val', label_file))
-            
-        return 'images\\train', 'images\\val'
 
     def run(self):
         try:
@@ -1174,7 +1533,7 @@ class TrainThread(QThread):
             if self.params['val']:
                 train_folder, val_folder = self.split_train_val(self.params['image_path'])
             else:
-                train_folder = "images\\" + os.path.basename(self.params['image_path'])
+                train_folder = "images/" + os.path.basename(self.params['image_path'])
                 val_folder = train_folder
             print(f"train_folder: {train_folder}, val_folder: {val_folder}")
             self.generate_dataset_yaml(dataset_path=os.path.dirname(os.path.dirname(image_path)),
