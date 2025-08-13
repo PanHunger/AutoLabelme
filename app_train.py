@@ -1,3 +1,4 @@
+import re
 import sys
 import argparse
 from ultralytics import YOLO
@@ -375,8 +376,6 @@ class TrainingInterface(QWidget):
         self.valid_path = QLineEdit()
         self.yaml_path = QLineEdit()
         self.train_thread = None
-        self.weights_path = None
-        self.cfg_path = None
         self.init_ui()
 
     def choose_json_path(self):
@@ -405,6 +404,9 @@ class TrainingInterface(QWidget):
             self.yaml_path.setText(path)
             # 自动调用 yaml 解析并更新 UI
             self.update_train_and_val_folder_from_yaml(path.replace('\\', '/'))
+            self.save_path.setText("yolo_weights/"+os.path.basename(self.yaml_path.text()).split('.')[0])
+            self.train_from.setChecked(False) 
+            self._on_train_from_state_changed()
 
     def init_ui(self):
         self.setWindowTitle("YOLO 训练程序")
@@ -440,7 +442,7 @@ class TrainingInterface(QWidget):
         train_type_label = QLabel("训练任务类型")
         train_task_layout.addWidget(train_type_label)
         self.train_type_combo = QComboBox()
-        self.train_type_combo.addItems(["多边形Segment训练(分割模型)", "矩形detect训练(检测模型)"])
+        self.train_type_combo.addItems(["矩形detect训练(检测模型)", "多边形Segment训练(分割模型)"])
         train_task_layout.addWidget(self.train_type_combo)
         main_layout.addLayout(train_task_layout)
         
@@ -506,7 +508,7 @@ class TrainingInterface(QWidget):
         save_path_btn.setFixedWidth(40)
         save_path_btn.clicked.connect(self.choose_save_path)
         if self.img_path.text() != "":
-            self.save_path = QLineEdit(os.path.join("yolo_weights", os.path.basename(self.img_path.text())))
+            self.save_path = QLineEdit("yolo_weights/"+os.path.basename(self.img_path.text()))
         else:
             self.save_path = QLineEdit("yolo_weights/")
         file_layout.addWidget(self.save_path, 6, 1)
@@ -651,8 +653,11 @@ class TrainingInterface(QWidget):
         self.log_text.setFont(custom_font)
         main_layout.addWidget(self.log_text)
         
+        progress_bar_layout = QHBoxLayout()
+        progress_bar_layout.addWidget(QLabel("当前进度:    "))
         self.progress_bar = QProgressBar()
-        main_layout.addWidget(self.progress_bar)
+        progress_bar_layout.addWidget(self.progress_bar)
+        main_layout.addLayout(progress_bar_layout)
 
         button_layout = QHBoxLayout()
 
@@ -750,7 +755,7 @@ class TrainingInterface(QWidget):
         # self.sam.setEnabled(use_json)
         # self._convert_button.setEnabled(use_json)
         
-        for element in [self.val, self.generate_negative_samples, self.generate_labels, self.only_verified, self.sam, self._convert_button]:
+        for element in [self.val, self.val_ratio, self.generate_negative_samples, self.generate_labels, self.only_verified, self.sam, self._convert_button]:
             element.setEnabled(use_json)
             # element.setStyleSheet(edit_enable_style if use_json else edit_disable_style)
             
@@ -1184,11 +1189,13 @@ class TrainingInterface(QWidget):
         # 获取当前时间，格式化时间为字符串，例如：2023-10-05_14-30-00
         current_time = datetime.datetime.now()
 
-        label_img_num = len(glob(os.path.join(self.img_path.text(), "*.json")))
-        folder_name = current_time.strftime("%Y-%m-%d_%H-%M-%S") + f"_with_{label_img_num}_images"
-
-        self.weights_path = os.path.join(self.save_path.text(), folder_name, "weights")
-        self.cfg_path = os.path.join("./cfgs", f"{os.path.basename(self.save_path.text())}.yaml")
+        # label_img_num 为当前文件夹下（包括子文件夹） 的所有 txt 文件数量
+        label_img_num = len(glob(os.path.join(self.img_path.text(), '**', '*.txt'), recursive=True))
+        # like 2025.10.05-14.30.00_10imgs
+        folder_name = current_time.strftime("%Y.%m.%d-%H.%M.%S") + f"_{label_img_num}imgs"
+        
+        self.save_path.setText('yolo_weights/{}/{}'.format(os.path.basename(self.yaml_path.text()).split('.')[0], folder_name))
+        # self.save_path.setText('yolo_weights/{}/{}'.format('xx', 'yy'))
 
         params = {
             "version": self.model_version_combo.currentText()[5:],
@@ -1206,15 +1213,14 @@ class TrainingInterface(QWidget):
             "flipud": self.flipud.value(),
             "p2": "-p2" if self.p2.isChecked() else "",
             "train_type_combo": self.train_type_combo.currentText(),
-            "base_path": self.save_path.text(),
+            "base_path": os.path.dirname(self.save_path.text()),
             "folder_name": folder_name,
             "annotation_path": self.annotation_path.text(),
             "image_path": self.img_path.text(),
             "val": self.val.isChecked(),
             "train_path": self.train_path.text(),
             "val_path": self.valid_path.text(),
-            "yaml_path": self.yaml_path.text(),
-            "cfg_path": self.cfg_path
+            "yaml_path": self.yaml_path.text()
         }
 
         # 启动训练线程
@@ -1233,7 +1239,6 @@ class TrainingInterface(QWidget):
             self.update_log("已请求停止训练...请稍候。")
             self.stop_button.setEnabled(False)
      
-     
 def get_gpu_memory():
     try:
         result = subprocess.check_output(
@@ -1242,6 +1247,20 @@ def get_gpu_memory():
         return int(result.split('\n')[0])  # 返回第一个 GPU 的显存占用
     except Exception:
         return "N/A"
+
+def remove_ansi_escape(text):
+    """移除所有ANSI转义序列"""
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    return ansi_escape.sub('', text)
+
+class EmittingStream:
+    def __init__(self, signal):
+        self.signal = signal
+    def write(self, text):
+        if text.strip() != "":
+            self.signal.emit(str(remove_ansi_escape(text)))
+    def flush(self):
+        pass
 
 class TrainThread(QThread):
     progress_signal = pyqtSignal(int)  # 信号：用于更新进度条
@@ -1256,359 +1275,137 @@ class TrainThread(QThread):
     def stop(self):
         """安全地停止线程"""
         self.running = False
-    
-    def find_unique_labels_in_directory(self, directory_path):
-        """
-        在指定文件夹中查找所有独一无二的label标签。
-        """
-        def extract_labels_from_json(file_path):
-            """
-            从单个JSON文件中提取所有label字段。
-            """
-            labels = set()
-            try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    if 'shapes' in data:
-                        for shape in data['shapes']:
-                            if 'label' in shape:
-                                labels.add(shape['label'])
-            except json.JSONDecodeError:
-                print(f"Error decoding JSON file: {file_path}")
-            return labels
         
-        unique_labels = set()
-        for root, dirs, files in os.walk(directory_path):
-            for file in files:
-                if file.endswith('.json'):
-                    file_path = os.path.join(root, file)
-                    labels = extract_labels_from_json(file_path)
-                    unique_labels.update(labels)
-        # 如果需要将结果存储为字典，键和值可以相同
-        labels_dict = {label: i for i, label in enumerate(unique_labels)}
-        return unique_labels, labels_dict
-    
-    def convert_json2txt(self, anno_dir, image_dir, class_map):
-        sub_folders = os.listdir(anno_dir)
-        if len(sub_folders) == 0 or len(sub_folders) >= 100:
-            sub_folders = [""]
-
-        for sub_folder in sub_folders:
-            source_path = anno_dir + '/' + sub_folder
-            dest_path = image_dir.replace("images", "labels") + "/" + sub_folder
-            # print(dest_path)
-            if not os.path.exists(dest_path):
-                os.makedirs(dest_path)
-                print(f"标注目录{dest_path}不存在，已创建目录")
-                
-            filenames = set(os.listdir(source_path))
-            filenames = [fn for fn in filenames if fn.endswith(('.json'))]  # 确保只选择 json 文件 
-            filenames.sort()
-
-            for i, filename in enumerate(filenames[:]):
-                
-                if not os.path.exists(os.path.join(source_path, filename.split('.')[0] + '.json')):
-                    with open(os.path.join(dest_path, filename.split('.')[0] + '.txt'), 'w') as f:
-                        pass
-                    continue
-                    
-                # 读取标注数据  
-                with open(os.path.join(source_path, filename.split('.')[0] + '.json'), 'r') as f:  
-                    annotation = json.load(f)  
-                
-                # 获取图片路径  
-                image_path = annotation['imagePath']
-                # 获取标注形状  
-                shapes = annotation['shapes']  
-                h = annotation['imageHeight']
-                w = annotation['imageWidth']
-                wh = np.array([w, h])
-                
-                with open(os.path.join(dest_path, filename.split('.')[0] + '.txt'), 'w') as f:
-                
-                    # 遍历所有形状并绘制多边形 
-                    for shape in shapes:  
-                        if shape['shape_type'] == 'polygon': # 多边形
-                            points = np.array(shape['points'], dtype=np.int32)  
-                            points = points.reshape((-1, 2))  # 将点转换为可以规范化的格式  
-                            normalized_points = points / wh
-                            normalized_points = normalized_points.flatten()
-                            f.write(f'{class_map[shape["label"]]} ')
-                            for p in normalized_points:
-                                f.write(f'{p} ')
-                            f.write('\n')
-                        if shape['shape_type'] == 'rectangle': # 矩形
-                            points = np.array(shape['points'], dtype=np.int32)  
-                            points = points.reshape((-1, 2))  # 将点转换为可以规范化的格式  
-                            normalized_points = points / wh
-                            normalized_points = normalized_points.flatten()
-                            f.write(f'{class_map[shape["label"]]} ')
-                            for p in normalized_points:
-                                f.write(f'{p} ')
-                            f.write('\n')
-                        if shape['shape_type'] == 'circle':  # 圆形
-                            points = np.array(shape['points'], dtype=np.int32)  
-                            points = points.reshape((-1, 2))  # 将点转换为可以规范化的格式  
-                            normalized_points = points / wh
-                            normalized_points = normalized_points.flatten()
-                            f.write(f'{class_map[shape["label"]]} ')
-                            for p in normalized_points:
-                                f.write(f'{p} ')
-                            f.write('\n')
-                        if shape['shape_type'] == 'line':  # 直线
-                            points = np.array(shape['points'], dtype=np.int32)  
-                            points = points.reshape((-1, 2))  # 将点转换为可以规范化的格式  
-                            normalized_points = points / wh
-                            normalized_points = normalized_points.flatten()
-                            f.write(f'{class_map[shape["label"]]} ')
-                            for p in normalized_points:
-                                f.write(f'{p} ')
-                            f.write('\n')
-                        if shape['shape_type'] == 'linestrip': # 折线
-                            points = np.array(shape['points'], dtype=np.int32)  
-                            points = points.reshape((-1, 2))  # 将点转换为可以规范化的格式  
-                            normalized_points = points / wh
-                            normalized_points = normalized_points.flatten()
-                            f.write(f'{class_map[shape["label"]]} ')
-                            for p in normalized_points:
-                                f.write(f'{p} ')
-                            f.write('\n')
-        
-    def split_train_val(self, data_path, val_ratio=0.1):
-
-        # 定义数据集路径和划分后的保存路径
-        root_path = os.path.dirname(os.path.dirname(data_path))  # 原始数据集路径
-    
-        images_path = data_path
-        labels_path = data_path.replace("images", "labels")
-
-        # print("data_path: ", data_path)
-        # print("root_path: ", root_path)
-        # print("images_path: ", images_path)
-        # print("labels_path: ", labels_path)
-
-        # 创建划分后的目录结构
-        if os.path.exists(os.path.join(root_path, 'images/train')):
-            shutil.rmtree(os.path.join(root_path, 'images/train'))
-        if os.path.exists(os.path.join(root_path, 'labels/train')):
-            shutil.rmtree(os.path.join(root_path, 'labels/train'))
-        if os.path.exists(os.path.join(root_path, 'images/val')):
-            shutil.rmtree(os.path.join(root_path, 'images/val'))
-        if os.path.exists(os.path.join(root_path, 'labels/val')):
-            shutil.rmtree(os.path.join(root_path, 'labels/val'))
-        os.makedirs(os.path.join(root_path, 'images/train'), exist_ok=False)
-        os.makedirs(os.path.join(root_path, 'labels/train'), exist_ok=False)
-        os.makedirs(os.path.join(root_path, 'images/val'), exist_ok=False)
-        os.makedirs(os.path.join(root_path, 'labels/val'), exist_ok=False)
-
-        # 获取所有有标注图片文件的文件名
-        label_files = [f for f in os.listdir(labels_path) if f.endswith('.txt')]  # 假设标注文件格式为 txt
-        image_files = [f.replace('.txt', '.jpg') for f in label_files]  # 假设图片格式为 jpg
-        
-        # print("label_files: ", label_files)
-        # print("image_files: ", image_files)
-        
-        # 随机打乱文件列表
-        combined = list(zip(image_files, label_files))
-        random.shuffle(combined)
-
-        # 定义划分比例（例如，90%用于训练，10%用于验证）
-        train_ratio = 1 - val_ratio
-        train_size = int(train_ratio * len(combined))
-
-        # 划分数据集
-        train_data = combined[:train_size]
-        val_data = combined[train_size:]
-
-        # 复制文件到相应的目录
-        for img_file, label_file in train_data:
-            # print(os.path.join(images_path, img_file), os.path.join(root_path, 'images/train', img_file))
-            shutil.copy(os.path.join(images_path, img_file), os.path.join(root_path, 'images/train', img_file))
-            # print(os.path.join(labels_path, label_file), os.path.join(root_path, 'labels/train', label_file))
-            shutil.copy(os.path.join(labels_path, label_file), os.path.join(root_path, 'labels/train', label_file))
-
-        for img_file, label_file in val_data:
-            print(os.path.join(images_path, img_file), os.path.join(root_path, 'images/val', img_file))
-            shutil.copy(os.path.join(images_path, img_file), os.path.join(root_path, 'images/val', img_file))
-            print(os.path.join(labels_path, label_file), os.path.join(root_path, 'labels/val', label_file))
-            shutil.copy(os.path.join(labels_path, label_file), os.path.join(root_path, 'labels/val', label_file))
-            
-        return 'images/train', 'images/val'
-
-    def generate_dataset_yaml(self, dataset_path, train_folder, val_folder, labels_dict, output_file):
-        """
-        生成符合指定格式的数据集 YAML 文件。
-        
-        Args:
-            dataset_path (str): 数据集根路径。
-            train_folder (str): 训练图片文件夹（相对于 dataset_path 的相对路径）。
-            val_folder (str): 验证图片文件夹（相对于 dataset_path 的相对路径）。
-            labels_dict (dict): 类别名称字典，键是类别索引，值是类别名称。
-            output_file (str): 输出 YAML 文件路径。
-        """
-        # 构造数据集配置信息
-        
-        labels_dict_reverse = {v: k for k, v in labels_dict.items()}
-        
-        dataset_config = {
-            "path": dataset_path,
-            "train": train_folder,
-            "val": val_folder,
-            "test": None,
-            "names": labels_dict_reverse
-        }
-
-        # 自定义的 YAML 转换函数，确保符合您需要的格式
-        def yaml_represent_none(self, _):
-            return self.represent_scalar('tag:yaml.org,2002:null', '')
-
-        yaml.add_representer(type(None), yaml_represent_none)  # 确保空值写作空字符串
-
-        # 写入 YAML 文件
-        with open(output_file, "w", encoding="utf-8") as f:
-            yaml.dump(
-                dataset_config, 
-                f, 
-                default_flow_style=False,  # 禁止使用大括号 {}
-                allow_unicode=True         # 支持中文等特殊字符
-            )
-
-        print(f"数据集 YAML 配置文件已成功保存到 {output_file}！")
-
     def run(self):
-        try:
-            self.log_signal.emit("开始训练...")
-            # 获取参数
-            version = self.params['version']
-            model_type = self.params['model_type']
-            pretrained_model = self.params['pretrained_model']
-            device = self.params['device']
-            batch_size = self.params['batch_size']
-            epochs = self.params['epochs']
-            degree = self.params['degree']
-            scale = self.params['scale']
-            imgsz = self.params['imgsz']
-            p2 = self.params['p2']
-            workers = self.params['workers']
-            patience = self.params['patience']
-            train_type_combo = self.params['train_type_combo']
-            base_path = self.params['base_path']
-            folder_name = self.params['folder_name']
-            image_path = self.params['image_path']
-                
-            print("GPU 可用？ ", torch.cuda.is_available())
-            # 加载 YOLO 模型
-            self.log_signal.emit("加载模型...")
-            if pretrained_model == "":
-                if train_type_combo == "多边形Segment训练(分割模型)":
-                    # print(f'./training/segment/cfg/yolov{version}{model_type}-seg{p2}.yaml')
-                    model = YOLO(f'./yolo_cfgs/segment/yolov{version}{model_type}-seg{p2}.yaml')
-                elif train_type_combo == "矩形detect训练(检测模型)":
-                    # print(f'./training/detect/cfg/yolov{version}{model_type}-det{p2}.yaml')
-                    model = YOLO(f'./yolo_cfgs/segment/yolov{version}{model_type}-det{p2}.yaml')
-            else:
-                model = YOLO(pretrained_model)
-            self.log_signal.emit("成功加载模型...")
-                
-            self.log_signal.emit("将 Labelme 的 JSON 标注转换成 YOLO 的 txt 标注...")
-            # 获取所有标签
-            unique_labels, labels_dict = self.find_unique_labels_in_directory(self.params['annotation_path'])
-            print("唯一标签: ", unique_labels)
-            print("标签字典: ", labels_dict)
-            if len(unique_labels) > 1:
-                needed_labels = None
-                while needed_labels is None:
-                    # 提取 names 部分的内容并放入字典中   
-                    needed_labels = easygui.multchoicebox(msg="select labels you want auto-labeing?",title="Setect labels",choices=tuple(unique_labels,))               
-                    if needed_labels == None:
-                        self.log_signal.emit("重新选择标签...")
-            else:
-                self.log_signal.emit("此数据集中仅有 <1> 个标签! 不需要选择标签!")
-            # 将 json 文件转换为 txt 文件
-            self.convert_json2txt(anno_dir=os.path.dirname(self.params['annotation_path']), 
-                                  image_dir=os.path.dirname(self.params['image_path']), 
-                                  class_map=labels_dict)
-            cfg_path = os.path.join("./cfgs", f"{os.path.basename(base_path)}.yaml")
+        # try:
+        self.log_signal.emit("开始训练...")
+        # # 重定向stdout和stderr
+        # sys.stdout = EmittingStream(self.log_signal)
+        # sys.stderr = EmittingStream(self.log_signal)
+        # 获取参数
+        version = self.params['version']
+        model_type = self.params['model_type']
+        pretrained_model = self.params['pretrained_model']
+        device = self.params['device']
+        batch_size = self.params['batch_size']
+        epochs = self.params['epochs']
+        degree = self.params['degree']
+        scale = self.params['scale']
+        imgsz = self.params['imgsz']
+        p2 = self.params['p2']
+        workers = self.params['workers']
+        patience = self.params['patience']
+        train_type_combo = self.params['train_type_combo']
+        base_path = self.params['base_path']
+        folder_name = self.params['folder_name']
+        image_path = self.params['image_path']
             
-            if self.params['val']:
-                train_folder, val_folder = self.split_train_val(self.params['image_path'])
-            else:
-                train_folder = "images/" + os.path.basename(self.params['image_path'])
-                val_folder = train_folder
-            print(f"train_folder: {train_folder}, val_folder: {val_folder}")
-            self.generate_dataset_yaml(dataset_path=os.path.dirname(os.path.dirname(image_path)),
-                                        train_folder=train_folder,
-                                        val_folder=val_folder,  # 没有验证集
-                                        labels_dict=labels_dict,
-                                        output_file=cfg_path)
-            self.log_signal.emit("成功加载数据!")
+        print("GPU 可用？ ", torch.cuda.is_available())
+        # 加载 YOLO 模型
+        self.log_signal.emit("加载模型...")
+        if pretrained_model == "":
+            if train_type_combo == "多边形Segment训练(分割模型)":
+                # print(f'./training/segment/cfg/yolov{version}{model_type}-seg{p2}.yaml')
+                model = YOLO(f'./yolo_cfgs/segment/yolov{version}{model_type}-seg{p2}.yaml')
+            elif train_type_combo == "矩形detect训练(检测模型)":
+                # print(f'./training/detect/cfg/yolov{version}{model_type}-det{p2}.yaml')
+                model = YOLO(f'./yolo_cfgs/detect/yolov{version}{model_type}-det{p2}.yaml')
+        else:
+            model = YOLO(pretrained_model)
+        self.log_signal.emit("成功加载模型...")
 
-            # 自定义训练过程的回调函数，用于更新进度
-            def on_train_epoch_start(trainer):
-                progress = int((trainer.epoch / trainer.args.epochs) * 100)
-                self.progress_signal.emit(progress)
-                # 获取训练指标
-                metrics = trainer.metrics
-                # print(metrics)
-                # print(trainer)
-                current_epoch = trainer.epoch
-                total_epochs = trainer.args.epochs
-                current_batch = trainer.args.batch
-                box_loss = metrics['val/box_loss'] if 'val/box_loss' in metrics else 'N/A'
-                mask_loss = metrics['val/seg_loss'] if 'val/seg_loss' in metrics else 'N/A'
-                box_map50 = metrics['metrics/mAP50(B)'] if 'metrics/mAP50(B)' in metrics else 'N/A'
-                mask_map50 = metrics['metrics/mAP50(M)'] if 'metrics/mAP50(M)' in metrics else 'N/A'
-
-                # 获取显存占用（单位：MB）
-                if torch.cuda.is_available():
-                    memory = get_gpu_memory()
-                else:
-                    memory = "N/A"
-
-                # 更新日志
-                log = (f"Epoch: {current_epoch}/{total_epochs}, Memory: {memory}MB, "
-                       f"Batch: {current_batch}, "
-                       f"Loss(Box): {round(box_loss, 2)}, Loss(Mask): {round(mask_loss, 2)}, "
-                       f"mAP50(Box): {round(box_map50, 2)}, mAP50(Mask): {round(mask_map50, 2)}")
-                
-                self.log_signal.emit(log)
-
-            self.log_signal.emit("启动训练...")
-            # 添加回调函数
-            model.add_callback("on_train_epoch_start", on_train_epoch_start)
-            
-            # 开始训练
-            results = model.train(
-                data=self.params['cfg_path'],
-                epochs=epochs,
-                imgsz=imgsz,
-                batch=batch_size,
-                degrees=degree,
-                scale=scale,
-                device=device,
-                workers=workers,
-                patience=patience,
-                project=base_path,  # 设置输出文件夹的路径
-                name=folder_name,  # 设置输出文件夹的名称
+        def on_train_start(trainer):
+            log = (
+                f"Image sizes {trainer.args.imgsz} train, {trainer.args.imgsz} val\n"
+                f"Using {trainer.train_loader.num_workers} dataloader workers\n"
+                f"Logging results to {trainer.save_dir}\n"
+                f"Starting training for " + (f"{trainer.args.time} hours..." if trainer.args.time else f"{trainer.epochs} epochs...")
             )
+            self.log_signal.emit(log)
 
-            self.progress_signal.emit(100)  # 训练完成，设置进度条为 100%
-            self.log_signal.emit("训练完成！")
-            self.botton.setText("训练完成！")
-            if os.path.exists(train_folder) and self.params['val']:
-                os.remove(train_folder)
-            if os.path.exists(val_folder) and self.params['val']:
-                os.remove(val_folder)
+        # 自定义训练过程的回调函数，用于更新进度
+        def safe_round(val, ndigits=2):
+            try:
+                return round(float(val), ndigits)
+            except Exception:
+                return val
+    
+        def on_train_epoch_end(trainer):
+            progress = int((trainer.epoch / trainer.args.epochs) * 100)
+            self.progress_signal.emit(progress)
+            # 获取训练指标
+            metrics = trainer.metrics
+            current_epoch = trainer.epoch
+            total_epochs = trainer.args.epochs
+            current_batch = trainer.args.batch
 
-        except Exception as e:
-            self.log_signal.emit(f"训练失败：{str(e)}")  
+            # 获取显存占用（单位：MB）
+            if torch.cuda.is_available():
+                memory = get_gpu_memory()
+            else:
+                memory = "N/A"
+
+            # 更新日志
+            train_type = self.params.get('train_type_combo', '')
+            # print(metrics)
+            
+            if '分割' in train_type or 'Segment' in train_type:
+                # 分割模型日志
+                log = (f"Epoch: {current_epoch:>3}/{total_epochs:>3}, Memory: {memory:>7}MB, "
+                        f"Batch: {current_batch:>3}, "
+                        f"box_loss: {safe_round(metrics['val/box_loss']):>5}, mask_loss: {safe_round(metrics['val/seg_loss']):>5}, "
+                        f"mAP50(B): {safe_round(metrics['metrics/mAP50(B)']):>5}, mAP50(M): {safe_round(metrics['metrics/mAP50(M)']):>5}")
+            else:
+                # 检测模型日志
+                log = (f"Epoch: {current_epoch:>3}/{total_epochs:>3}, Memory: {memory:>7}MB, "
+                        f"Batch: {current_batch:>3}, "
+                        f"box_loss: {safe_round(metrics['val/box_loss']):>5}, cls_loss: {safe_round(metrics['val/cls_loss']):>5}, dfl_loss: {safe_round(metrics['val/dfl_loss']):>5}, "
+                        f"precision(B): {safe_round(metrics['metrics/precision(B)']):>5}, recall(B): {safe_round(metrics['metrics/recall(B)']):>5}, "
+                        f"mAP50(B): {safe_round(metrics['metrics/mAP50(B)']):>5}, mAP50-95(B): {safe_round(metrics['metrics/mAP50-95(B)']):>5}"
+                )
+                # 将 log 格式化输出
+                
+            
+            self.log_signal.emit(log)
+
+        self.log_signal.emit("启动训练...")
+        
+        # 添加回调函数
+        model.add_callback("on_train_start", on_train_start)
+        model.add_callback("on_train_epoch_end", on_train_epoch_end)
+        
+        # 开始训练
+        results = model.train(
+            data=self.params['yaml_path'],
+            epochs=epochs,
+            imgsz=imgsz,
+            batch=batch_size,
+            degrees=degree,
+            scale=scale,
+            device=device,
+            workers=workers,
+            patience=patience,
+            project=base_path,  # 设置输出文件夹的路径
+            name=folder_name,  # 设置输出文件夹的名称
+        )
+
+        self.progress_signal.emit(100)  # 训练完成，设置进度条为 100%
+        self.log_signal.emit("训练完成！")
+        self.botton.setText("训练完成！")
+        # if os.path.exists(train_folder) and self.params['val']:
+        #     os.remove(train_folder)
+        # if os.path.exists(val_folder) and self.params['val']:
+        #     os.remove(val_folder)
+
+        # except Exception as e:
+        #     self.log_signal.emit(f"训练失败：{str(e)}")  
             
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     set_dark_theme(app)
     apply_stylesheet(app)
     # 设置全局默认字体
-    font = QFont("微软雅黑", 10)  # 字体名称为微软雅黑，大小为16
+    font = QFont("微软雅黑", 10)  # 字体名称为微软雅黑，大小为 16
     app.setFont(font)
     window = TrainingInterface()
     window.show()
