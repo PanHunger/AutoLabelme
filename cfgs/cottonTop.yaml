@@ -1,0 +1,6 @@
+names:
+  0: cottonTop
+path: E:/Projects/PycharmProjects/2-YoloSeries/yolov8_datasets/ChuangDian/20250813_cotton_top
+test:
+train: images/train
+val: images/train

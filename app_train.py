@@ -628,7 +628,7 @@ class TrainingInterface(QWidget):
         main_layout.addWidget(params_group)
         
         # Labeling parameters
-        params_group = QGroupBox("标注参数")
+        params_group = QGroupBox("标注参数 (暂不可用)")
         params_layout = QGridLayout()
         
         self.generate_labels = QCheckBox("自动为剩余数据生成标注")
@@ -636,7 +636,7 @@ class TrainingInterface(QWidget):
         params_layout.addWidget(self.generate_labels, 1, 0)
 
         self.only_verified = QCheckBox("只使用Verified标注数据")
-        self.only_verified.setChecked(True)
+        self.only_verified.setChecked(False)
         params_layout.addWidget(self.only_verified, 1, 1)
         
         self.sam = QCheckBox("使用Segmentation模型优化标注 (仅在目标较大时使用)")
@@ -1000,16 +1000,24 @@ class TrainingInterface(QWidget):
             if os.path.isdir(os.path.join(root_path, item)):
                 sub_folders.append(item)
         sub_folders.append("")
+        
+        # 查找指定名称的图片文件（未知后缀）
+        def find_image_by_name(folder, basename):
+            for fn in os.listdir(folder):
+                name, ext = os.path.splitext(fn)
+                if name == basename and ext.lower() in [".jpg", ".bmp", ".png", ".tif", ".jpeg", ".gif", ".webp"]:
+                    return os.path.join(folder, fn)
+            return None
 
         for sub_folder in sub_folders:
             if sub_folder in ["images", "labels"]:
                 continue
             source_path = root_path if sub_folder == "" else root_path + '/' + sub_folder
             for f in os.listdir(source_path):
-                if f.endswith(".txt"):
-                    label_files.append(os.path.join(source_path, f))
-                elif f.endswith((".jpg", ".bmp", ".png", ".tif", ".jpeg", ".gif", ".webp")):
-                    image_files.append(os.path.join(source_path, f))
+                if f.endswith(".json"):
+                    label_files.append(os.path.join(source_path, f.split('.')[0]+'.txt'))
+                    image_file = find_image_by_name(source_path, f.split('.')[0])
+                    image_files.append(image_file)
             
             # image_files += [os.path.join(source_path, f) for f in os.listdir(source_path) if f.endswith(".jpg", ".bmp", ".png")]
             # label_files += [os.path.join(source_path, f) for f in os.listdir(source_path) if f.endswith(".txt")]
@@ -1190,7 +1198,7 @@ class TrainingInterface(QWidget):
         current_time = datetime.datetime.now()
 
         # label_img_num 为当前文件夹下（包括子文件夹） 的所有 txt 文件数量
-        label_img_num = len(glob(os.path.join(self.img_path.text(), '**', '*.txt'), recursive=True))
+        label_img_num = len(glob(os.path.join(self.img_path.text(), '**', '*.txt'), recursive=True)) // 2
         # like 2025.10.05-14.30.00_10imgs
         folder_name = current_time.strftime("%Y.%m.%d-%H.%M.%S") + f"_{label_img_num}imgs"
         
@@ -1279,6 +1287,7 @@ class TrainThread(QThread):
     def run(self):
         # try:
         self.log_signal.emit("开始训练...")
+        self.progress_signal.emit(0)
         # # 重定向stdout和stderr
         # sys.stdout = EmittingStream(self.log_signal)
         # sys.stderr = EmittingStream(self.log_signal)

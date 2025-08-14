@@ -2516,16 +2516,23 @@ class MainWindow(QtWidgets.QMainWindow):
          
 
     def cleanup_training_window(self):
-        weight_path = self.training_window.weights_path
-        cfg_path = self.training_window.cfg_path
+        weight_path = self.training_window.save_path.text() + '/weight/best.pt'
+        cfg_path = self.training_window.yaml_path.text()
         """子窗口销毁时清理引用"""
         print("清理子窗口引用...")
         self.training_window = None  # 删除对 TrainingInterface 的引用
         print("子窗口引用已清理")
-        self.yolo_auto_labeling(
-            weight_path=weight_path,
-            # cfg_path=cfg_path
-            )
+        
+        yolo_sidebar = getattr(self, 'yolo_sidebar', None)
+        if os.path.exists(weight_path) and yolo_sidebar is not None:
+            yolo_sidebar.model_path_edit.setText(weight_path)
+        if os.path.exists(cfg_path) and yolo_sidebar is not None:
+            yolo_sidebar.yaml_path_edit.setText(cfg_path)
+        
+        # self.yolo_auto_labeling(
+        #     weight_path=weight_path,
+        #     cfg_path=cfg_path
+        #     )
         
     
     def analyse_result(self):
@@ -3454,8 +3461,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # 自动刷新当前图片和标注
         self.loadFile(img_path)
 
-    def yolo_auto_labeling(self, weight_path=None, cfg_path='cfgs'):
-        
+    def yolo_auto_labeling(self, weight_path=None, cfg_path=None):
+               
         # 获取侧边栏widget
         yolo_sidebar = getattr(self, 'yolo_sidebar', None)
         if yolo_sidebar is None:
