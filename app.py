@@ -2509,7 +2509,9 @@ class MainWindow(QtWidgets.QMainWindow):
             # apply_stylesheet(self.training_window)
             font = QFont("微软雅黑", 10)  # 字体名称为微软雅黑，大小为 16
             self.training_window.setFont(font)
-            self.training_window.setWindowModality(Qt.ApplicationModal) # 模态窗口（阻塞主窗口）
+            # self.training_window.setWindowModality(Qt.NonModel) # 非模态，完全不阻塞主窗口 (默认)
+            # self.training_window.setWindowModality(Qt.ApplicationModal) # 窗口模态，只阻塞父窗口，不影响其他窗口
+            self.training_window.setWindowModality(Qt.ApplicationModal) # 应用模态，阻塞整个应用的所有窗口
             self.training_window.show()
             # 连接子窗口关闭信号到回调函数
             self.training_window.destroyed.connect(self.cleanup_training_window)

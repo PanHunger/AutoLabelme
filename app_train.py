@@ -525,6 +525,7 @@ class TrainingInterface(QWidget):
         self.input_size.setRange(64, 4096)
         self.input_size.setSingleStep(32)
         self.input_size.setValue(640)
+        self.input_size.setMaximumWidth(90)
         params_layout.addWidget(self.input_size, 0, 1)
 
         params_layout.addWidget(QLabel("每批图像数量"), 0, 2)
@@ -532,34 +533,39 @@ class TrainingInterface(QWidget):
         self.batch_size.setRange(-1, 128)
         self.batch_size.setSingleStep(1)
         self.batch_size.setValue(-1)
+        self.batch_size.setMaximumWidth(90)
         params_layout.addWidget(self.batch_size, 0, 3)
 
-        params_layout.addWidget(QLabel("最大训练次数"), 1, 0)
+        params_layout.addWidget(QLabel("最大训练次数"), 0, 4)
         self.max_epochs = QSpinBox()
         self.max_epochs.setRange(20, 1000)
         self.max_epochs.setSingleStep(10)
         self.max_epochs.setValue(100)
-        params_layout.addWidget(self.max_epochs, 1, 1)
+        self.max_epochs.setMaximumWidth(90)
+        params_layout.addWidget(self.max_epochs, 0, 5)
 
-        params_layout.addWidget(QLabel("无改善停止次数"), 1, 2)
+        params_layout.addWidget(QLabel("无改善停止次数"), 0, 6)
         self.patience = QSpinBox()
         self.patience.setRange(5, 100)
         self.patience.setSingleStep(1)
         self.patience.setValue(20)
-        params_layout.addWidget(self.patience, 1, 3)
+        self.patience.setMaximumWidth(90)
+        params_layout.addWidget(self.patience, 0, 7)
 
         self.use_gpu = QCheckBox("使用GPU训练")
         self.use_gpu.setChecked(True)
-        params_layout.addWidget(self.use_gpu, 2, 0)
+        params_layout.addWidget(self.use_gpu, 0, 10)
         self.gpus = QLineEdit("0")
-        params_layout.addWidget(self.patience, 2, 1)
+        self.gpus.setMaximumWidth(100)
+        params_layout.addWidget(self.gpus, 0, 11)
 
-        params_layout.addWidget(QLabel("加载线程数"), 2, 2)
+        params_layout.addWidget(QLabel("加载线程数"), 0, 8)
         self.num_threads = QSpinBox()
         self.num_threads.setRange(1, 16)
         self.num_threads.setSingleStep(1)
         self.num_threads.setValue(8)
-        params_layout.addWidget(self.num_threads, 2, 3)
+        self.num_threads.setMaximumWidth(90)
+        params_layout.addWidget(self.num_threads, 0, 9)
         
         params_layout.addWidget(QLabel("模型大小"), 3, 0)
         self.size_n = QRadioButton("n")
@@ -576,31 +582,18 @@ class TrainingInterface(QWidget):
         size_layout.addWidget(self.size_x)
         params_layout.addLayout(size_layout, 3, 1, 1, 3)
 
-        self.p2 = QCheckBox("小目标检测P2增强")
-        params_layout.addWidget(self.p2, 4, 3)
+        self.p2 = QCheckBox("小目标P2增强")
+        params_layout.addWidget(self.p2, 3, 6)
         
-        self.val = QCheckBox("分配验证集比例")
-        self.val.setEnabled(False)
-        params_layout.addWidget(self.val, 4, 0)
-        
-        self.val_ratio = QDoubleSpinBox()
-        self.val_ratio.setRange(0.0, 1.0)
-        self.val_ratio.setValue(0.1)
-        self.val_ratio.setSingleStep(0.01)
-        params_layout.addWidget(self.val_ratio, 4, 1)
-        
-        self.generate_negative_samples = QCheckBox("生成负样本")
-        self.generate_negative_samples.setChecked(False)
-        params_layout.addWidget(self.generate_negative_samples, 4, 2)
-
-        # self.auto_correct = QCheckBox("自动修正图像格式")
-        # params_layout.addWidget(self.auto_correct, 4, 2)
-        
+        self.p5 = QCheckBox("大目标P6增强")
+        params_layout.addWidget(self.p5, 3, 8)
+               
         params_layout.addWidget(QLabel("旋转角度"), 5, 0)
         self.degree = QDoubleSpinBox()
         self.degree.setValue(0.0)
         self.degree.setRange(0.0, 1.0)
         self.degree.setSingleStep(0.01)
+        self.degree.setMaximumWidth(90)
         params_layout.addWidget(self.degree, 5, 1)
 
         params_layout.addWidget(QLabel("缩放比例"), 5, 2)
@@ -608,21 +601,24 @@ class TrainingInterface(QWidget):
         self.scale.setValue(0.5)
         self.scale.setRange(0.0, 1.0)
         self.scale.setSingleStep(0.01)
+        self.scale.setMaximumWidth(90)
         params_layout.addWidget(self.scale, 5, 3)
 
-        params_layout.addWidget(QLabel("左右翻转概率"), 6, 0)
+        params_layout.addWidget(QLabel("左右翻转概率"), 5, 4)
         self.fliplr = QDoubleSpinBox()
         self.fliplr.setValue(0.5)
         self.fliplr.setRange(0.0, 1.0)
         self.fliplr.setSingleStep(0.01)
-        params_layout.addWidget(self.fliplr, 6, 1)
+        self.fliplr.setMaximumWidth(90)
+        params_layout.addWidget(self.fliplr, 5, 5)
 
-        params_layout.addWidget(QLabel("上下翻转概率"), 6, 2)
+        params_layout.addWidget(QLabel("上下翻转概率"), 5, 6)
         self.flipud = QDoubleSpinBox()
         self.flipud.setRange(0.0, 1.0)
         self.flipud.setValue(0.5)
         self.flipud.setSingleStep(0.01)
-        params_layout.addWidget(self.flipud, 6, 3)
+        self.flipud.setMaximumWidth(90)
+        params_layout.addWidget(self.flipud, 5, 7)
         
         params_group.setLayout(params_layout)
         main_layout.addWidget(params_group)
@@ -639,8 +635,26 @@ class TrainingInterface(QWidget):
         self.only_verified.setChecked(False)
         params_layout.addWidget(self.only_verified, 1, 1)
         
-        self.sam = QCheckBox("使用Segmentation模型优化标注 (仅在目标较大时使用)")
+        self.sam = QCheckBox("使用 SAM 模型优化标注 (仅在目标较大时有效)")
         params_layout.addWidget(self.sam, 1, 2)
+        
+        self.val = QCheckBox("分配验证集比例")
+        self.val.setEnabled(False)
+        params_layout.addWidget(self.val, 1, 6)
+        
+        self.val_ratio = QDoubleSpinBox()
+        self.val_ratio.setRange(0.0, 1.0)
+        self.val_ratio.setValue(0.1)
+        self.val_ratio.setSingleStep(0.01)
+        self.val_ratio.setMaximumWidth(90)
+        params_layout.addWidget(self.val_ratio, 1, 7)
+        
+        self.generate_negative_samples = QCheckBox("生成负样本")
+        self.generate_negative_samples.setChecked(False)
+        params_layout.addWidget(self.generate_negative_samples, 1, 5)
+
+        # self.auto_correct = QCheckBox("自动修正图像格式")
+        # params_layout.addWidget(self.auto_correct, 4, 2)
         
         params_group.setLayout(params_layout)
         main_layout.addWidget(params_group)
@@ -1095,6 +1109,18 @@ class TrainingInterface(QWidget):
         self.update_log(f"数据集 YAML 配置文件已成功保存到 {output_file}！")
 
     def auto_convert_to_yolo(self):
+        # if not os.path.exists(self.yaml_path.text()):
+        #     self.update_log("请先选择正确的 YAML 数据集配置文件！")
+        #     return
+        # if not os.path.exists(self.train_path.text()):
+        #     self.update_log("请确认 YAML 中训练数据集是否存在！")
+        #     return
+        if not os.path.exists(self.img_path.text()):
+            self.update_log("请先选择正确的数据集图像路径！（包含 jpg、png、bmp 等格式图片文件）")
+            return
+        if not os.path.exists(self.annotation_path.text()):
+            self.update_log("请先选择正确的数据集标注路径！（包含 json 格式标注文件）")
+            return
         self.update_progress(0)
         self.update_log("将 Labelme 的 JSON 标注转换成 YOLO 的 txt 标注...")
         # 获取所有标签
