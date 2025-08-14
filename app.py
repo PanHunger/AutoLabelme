@@ -2245,7 +2245,8 @@ class MainWindow(QtWidgets.QMainWindow):
         dlg.setAcceptMode(QtWidgets.QFileDialog.AcceptSave)
         dlg.setOption(QtWidgets.QFileDialog.DontConfirmOverwrite, False)
         dlg.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, False)
-        basename = osp.basename(osp.splitext(self.filename)[0])
+        if self.filename is not None:
+            basename = osp.basename(osp.splitext(self.filename)[0])
         if self.output_dir:
             default_labelfile_name = osp.join(
                 self.output_dir, basename + LabelFile.suffix
@@ -3493,35 +3494,6 @@ class MainWindow(QtWidgets.QMainWindow):
         if reply != QMessageBox.Ok:
             return
         
-        # # if weight_path == None:
-        # #     weight_path = QFileDialog.getExistingDirectory(self, "Choose 'yolo_weights (with *.pt)' folder:", 'yolo_weights', QFileDialog.ShowDirsOnly)
-        # #     if weight_path == '':
-        # #         return
-        
-        # # weight_list=[]
-        # # for item in sorted(os.listdir(weight_path)):
-        # #     if item.endswith('.h5') or item.endswith('.pt') or item.endswith('.pth'):
-        # #         weight_list.append(item)
-        # # if len(weight_list) == 0:
-        # #     QMessageBox.information(self, u'Wrong!', u'have no weight (with *.pt) file in this folder, please check again.')
-        # #     return
-        # # items = tuple(weight_list)
-        # # if len(weight_list) > 0 :
-        # #     weights, ok = QInputDialog.getItem(self, "Select",
-        # #     f"Model weights file(under {weight_path}):", 
-        # #     items, 0, False)
-        # #     if not ok:
-        # #         return
-        # #     else:
-        # #         weights = os.path.join(weight_path, weights)
-        # # else:
-        # #     weights,_ = QFileDialog.getOpenFileName(self,"'yolo_weights (with *.pt)' is empty, choose model weights file:")
-        # #     if not (weights.endswith('.pt') or weights.endswith('.pth')):
-        # #         QMessageBox.information(self, u'Wrong!', u'weights file must endswith .h5 or .pt or .pth')
-        # #         return
-        # conf_thres = self._ai_prompt_widget.get_iou_threshold()
-        # iou_thres = self._ai_prompt_widget.get_score_threshold()
-        
         # Initialize
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         # half = device.type != 'cpu'  # half precision only supported on CUDA
@@ -3531,67 +3503,6 @@ class MainWindow(QtWidgets.QMainWindow):
         model = YOLO(weights)
         task = model.task
         model.to(device)
-
-        # if cfg_path == 'cfgs':
-        #     cfg_path = QFileDialog.getExistingDirectory(self, "Choose 'dataset configure (with *.yaml)' folder:", '', QFileDialog.ShowDirsOnly)
-        #     if cfg_path == '':
-        #         return
-
-        # cfg_list = []
-        # for item in sorted(os.listdir(cfg_path)):
-        #     if item.endswith('.yaml'):
-        #         cfg_list.append(item)
-        # items = tuple(cfg_list)
-        # if len(cfg_list) > 0 :
-        #     cfgs, ok = QInputDialog.getItem(self, 
-        #                                     "Select", 
-        #                                     "Configure file:", 
-        #                                     items, 0, False)
-        #     if not ok:
-        #         return
-        #     else:
-        #         cfgs = os.path.join(cfg_path, cfgs)
-        # else:
-        #     cfgs,_ = QFileDialog.getOpenFileName(self, "'dataset configure (with *.yaml)' is empty, choose configure file:")
-        #     if not cfgs.endswith('.yaml'):
-        #         QMessageBox.information(self, u'Wrong!', u'configure file must endswith .yaml')
-        #         return
-
-        # # 读取 YAML 文件
-        # with open(cfgs, 'r', encoding='utf-8') as file:
-        #     data = yaml.safe_load(file)
-            
-        # # 提取 names 部分的内容并放入字典中
-        # names = [value for key, value in data['names'].items()]                     
-        # if len(names) == 1:
-        #     needed_labels = names
-        # else:
-        #     msg = "Select labels you want auto-labeling?"
-        #     title = "Select Labels"      
-        #     sorted_names = sorted(names) 
-        #     dialog = MultiChoiceDialog(msg, title, sorted_names)
-        #     if dialog.exec_() == QDialog.Accepted:
-        #         needed_labels = dialog.selected_choices()
-        #         print("Selected labels:", needed_labels)
-        #     else:
-        #         print("Dialog cancelled")
-        #         return
-              
-        # 询问是否使用 Simplify 来稀疏多边形
-        # 如果选择了是，则询问容差值
-        msg = f'请确认是否使用如下配置对整个数据集自动标注：\n模型: {weights} \n配置: {yaml_path} \n数据集: {source}'
-        msg = textwrap.fill(msg, width=50)
-        reply = QMessageBox.question(self, '自动标注确认', msg, QMessageBox.Ok | QMessageBox.Cancel, QMessageBox.Ok)
-        if reply != QMessageBox.Ok:
-            return
-        # # if weight_path == None:
-        #     yes_or_no = True if yes_or_no == "Yes" else False
-        
-        # # set imsize
-        # if yes_or_no:
-        #     tolerance, OK = QInputDialog.getInt(self, 'Simplify Setting', 'tolerance value (default=0.5):', value=5)
-        #     if not OK:
-        #         return
                 
         # 函数：将图像转换为Base64编码
         def image_to_base64(image_path):
@@ -3639,7 +3550,7 @@ class MainWindow(QtWidgets.QMainWindow):
             result = model(im0s, augment=False, conf=conf_thres, iou=iou_thres)
             cls = result[0].boxes.cls
             cls = cls.cpu().numpy().astype(np.int32).tolist()
-            names = result[0].names.cpu()
+            names = result[0].names
                 
             if task == "classify":
                 pass
@@ -3716,15 +3627,15 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.filePath == None:
             QMessageBox.information(self,u'Wrong!',u'have no loaded folder yet, please check again.')
             return
-        try:
-            #=====choose model and input label name=====
-            # using yolo autolabeling   
-            with torch.no_grad():
-                self.yolo_auto_labeling()
-            return
+        # try:
+        #=====choose model and input label name=====
+        # using yolo autolabeling   
+        with torch.no_grad():
+            self.yolo_auto_labeling()
+        return
         
-        except Exception as e:
-            QMessageBox.information(self,u'Sorry!',u'something is wrong. ({})'.format(e))
+        # except Exception as e:
+        #     QMessageBox.information(self,u'Sorry!',u'something is wrong. ({})'.format(e))
             
     def data_auto_augment(self):
         """data augment, using Affine change, intensity change, contrast change, gama change, Gaussian fillter to augment img data.

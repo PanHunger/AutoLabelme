@@ -1424,8 +1424,13 @@ class TrainThread(QThread):
             name=folder_name,  # 设置输出文件夹的名称
         )
 
-        self.progress_signal.emit(100)  # 训练完成，设置进度条为 100%
+        self.progress_signal.emit(95)  # 训练完成，设置进度条为 100%
         self.log_signal.emit("训练完成！")
+        # Export the model to ONNX format
+        model.export(format="onnx")  # creates 'yolo11n.onnx'
+        self.progress_signal.emit(100)  # 训练完成，设置进度条为 100%
+        self.log_signal.emit("导出模型成功！")
+
         self.botton.setText("训练完成！")
         # if os.path.exists(train_folder) and self.params['val']:
         #     os.remove(train_folder)
