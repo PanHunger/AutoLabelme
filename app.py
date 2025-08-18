@@ -2553,7 +2553,7 @@ class MainWindow(QtWidgets.QMainWindow):
             for path in natsort.natsorted(os.listdir(json_root)):
                 if path.split('.')[-1] == 'json':
                     json_path = osp.join(json_root, path)
-                    with open(json_path, "r") as f:
+                    with open(json_path, "r", encoding="utf-8") as f:
                         data = json.load(f)
                         verified = data.get("verified")
                         if not verified:
@@ -2744,7 +2744,7 @@ class MainWindow(QtWidgets.QMainWindow):
                         return
                 
                 # 将 JSON 字符串加载为 Python 字典
-                with open(last_path, 'r') as f:  
+                with open(last_path, 'r', encoding="utf-8") as f:  
                     data = json.load(f) 
                     # 修改 imagePath 字段的值
                     data['imagePath'] = imgFileName
@@ -3535,7 +3535,7 @@ class MainWindow(QtWidgets.QMainWindow):
         for path, img, im0s, vid_cap in dataset:
             json_path = path.split('.')[0] + ".json"
             if os.path.exists(json_path):
-                with open(json_path, "r") as f:
+                with open(json_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     verified = data.get("verified")
                     if verified:
@@ -3581,7 +3581,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
             # 将结果保存为JSON文件
             json_path = path.split('.')[0] + ".json"
-            with open(json_path, 'w') as f:
+            with open(json_path, 'w', encoding="utf-8") as f:
                 json.dump(labelme_json, f, indent=4)
 
             success_index += 1

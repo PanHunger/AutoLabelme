@@ -895,12 +895,12 @@ class TrainingInterface(QWidget):
                 # 为没有标注的图像生成标签（负样本）
                 if not os.path.exists(os.path.join(source_path, filename.split('.')[0] + '.json')):
                     if self.generate_negative_samples.isChecked():
-                        with open(os.path.join(dest_path, filename.split('.')[0] + '.txt'), 'w') as f:
+                        with open(os.path.join(dest_path, filename.split('.')[0] + '.txt'), 'w', encoding="utf-8") as f:
                             pass
                     continue
                     
                 # 读取标注数据  
-                with open(os.path.join(source_path, filename.split('.')[0] + '.json'), 'r') as f:  
+                with open(os.path.join(source_path, filename.split('.')[0] + '.json'), 'r', encoding="utf-8") as f:  
                     annotation = json.load(f)  
                 
                 # 获取图片路径  
@@ -911,7 +911,7 @@ class TrainingInterface(QWidget):
                 w = annotation['imageWidth']
                 wh = np.array([w, h])
                 
-                with open(os.path.join(dest_path, filename.split('.')[0] + '.txt'), 'w') as f:
+                with open(os.path.join(dest_path, filename.split('.')[0] + '.txt'), 'w', encoding="utf-8") as f:
                 
                     # 遍历所有形状并绘制多边形 
                     for shape in shapes:  
