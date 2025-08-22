@@ -867,7 +867,7 @@ class TrainingInterface(QWidget):
         labels_dict = {label: i for i, label in enumerate(unique_labels)}
         return unique_labels, labels_dict
     
-    def convert_json2txt(self, anno_dir, image_dir, class_map):
+    def convert_json2txt(self, anno_dir, image_dir, class_map, needed_labels):
         # sub_folders = os.listdir(anno_dir)
         # sub_folders = [f for f in Path(anno_dir).iterdir() if f.is_dir()]
         sub_folders = []
@@ -915,6 +915,9 @@ class TrainingInterface(QWidget):
                 
                     # 遍历所有形状并绘制多边形 
                     for shape in shapes:  
+                        
+                        if shape["label"] not in needed_labels:
+                            continue
                         if shape['shape_type'] == 'polygon': # 多边形
                             if self.train_type_combo.currentText() == "多边形Segment训练(分割模型)":
                                 points = np.array(shape['points'], dtype=np.int32)  
@@ -1127,7 +1130,8 @@ class TrainingInterface(QWidget):
         unique_labels, labels_dict = self.find_unique_labels_in_directory(self.annotation_path.text())
         print("唯一标签: ", unique_labels)
         print("标签字典: ", labels_dict)
-        self.update_progress(20)
+        
+        self.update_progress(10)
         if len(unique_labels) > 1:
             needed_labels = None
             while needed_labels is None:
@@ -1137,11 +1141,18 @@ class TrainingInterface(QWidget):
                     self.update_log("重新选择标签...")
         else:
             self.update_log("此数据集中仅有 <1> 个标签! 不需要选择标签!")
-        self.update_progress(40)
+        self.update_progress(20)
         # 将 json 文件转换为 txt 文件
+        print("选择的标签：", needed_labels)
+        reserved_labels_dict = {}
+        for i, nl in enumerate(needed_labels):
+            reserved_labels_dict[nl] = i
+        print("选择的标签字典: ", reserved_labels_dict)
+        
         self.convert_json2txt(anno_dir=self.annotation_path.text(), 
                               image_dir=self.img_path.text(), 
-                              class_map=labels_dict)
+                              class_map=reserved_labels_dict,
+                              needed_labels=needed_labels)
         # cfg_path = os.path.join("./cfgs", f"{os.path.basename(self.save_path.text())}.yaml")
         
         self.update_progress(60)
@@ -1154,8 +1165,8 @@ class TrainingInterface(QWidget):
         self.update_progress(80)
         self.generate_dataset_yaml(dataset_path=self.img_path.text(),
                                    train_folder=train_folder,
-                                   val_folder=val_folder,  # 没有验证集
-                                   labels_dict=labels_dict,
+                                   val_folder=val_folder,  # 可以没有验证集
+                                   labels_dict=reserved_labels_dict,
                                    output_file=self.yaml_path.text())
         self.update_train_and_val_folder_from_yaml(self.yaml_path.text())
         self.update_progress(100)
