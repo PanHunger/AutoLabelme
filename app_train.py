@@ -1140,6 +1140,7 @@ class TrainingInterface(QWidget):
                 if needed_labels == None:
                     self.update_log("重新选择标签...")
         else:
+            needed_labels = unique_labels
             self.update_log("此数据集中仅有 <1> 个标签! 不需要选择标签!")
         self.update_progress(20)
         # 将 json 文件转换为 txt 文件
