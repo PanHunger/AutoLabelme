@@ -410,7 +410,7 @@ class TrainingInterface(QWidget):
 
     def init_ui(self):
         self.setWindowTitle("YOLO 训练程序")
-        self.resize(1650, 1300)
+        self.resize(1700, 1350)
         # Main Layout
         main_layout = QVBoxLayout()
         
