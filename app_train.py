@@ -726,7 +726,14 @@ class TrainingInterface(QWidget):
         button_layout.addWidget(self.stop_button)
         self.stop_button.clicked.connect(self.stop_training)
         self.stop_button.setEnabled(False)
-        
+
+        # 添加“生成训练命令”按钮
+        generate_command_button = QPushButton("生成训练命令")
+        add_shadow_effect(generate_command_button)
+        generate_command_button.setFont(QFont("微软雅黑", 10))
+        generate_command_button.clicked.connect(self.generate_training_command)
+        button_layout.addWidget(generate_command_button)
+
         help_button = QPushButton("说明")
         add_shadow_effect(help_button)
         help_button.setFont(custom_font)
@@ -1285,6 +1292,39 @@ class TrainingInterface(QWidget):
             self.update_log("已请求停止训练...请稍候。")
             self.stop_button.setEnabled(False)
      
+    def generate_training_command(self):
+        """生成 YOLO 训练命令并显示在日志中"""
+        if not self.yaml_path.text():
+            self.update_log("请先填写数据集配置文件路径 (YAML)！")
+            return
+
+        if self.size_n.isChecked():
+            model_type = "n"
+        elif self.size_s.isChecked():
+            model_type = "s"
+        elif self.size_m.isChecked():
+            model_type = "m"
+        elif self.size_l.isChecked():
+            model_type = "l"
+        elif self.size_x.isChecked():
+            model_type = "x"
+        else:
+            model_type = "n"
+
+        command = (
+            f"yolo detect train "
+            f"data={self.yaml_path.text()} "
+            f"model=yolo{model_type}.yaml "
+            f"pretrained={self.pretrained_path.text() if self.pretrained_path.text() else 'None'} "
+            f"epochs={self.max_epochs.value()} "
+            f"imgsz={self.input_size.value()} "
+            f"batch={self.batch_size.value()} "
+            f"device={self.gpus.text() if self.use_gpu.isChecked() else 'cpu'}"
+        )
+
+        self.update_log("生成的训练命令：")
+        self.update_log(command)
+
 def get_gpu_memory():
     try:
         result = subprocess.check_output(
@@ -1462,4 +1502,3 @@ if __name__ == "__main__":
     window = TrainingInterface()
     window.show()
     sys.exit(app.exec_())
-    
