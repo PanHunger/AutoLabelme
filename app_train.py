@@ -376,7 +376,22 @@ class TrainingInterface(QWidget):
         self.valid_path = QLineEdit()
         self.yaml_path = QLineEdit()
         self.train_thread = None
+        # （新）存储额外文件夹路径
+        self.extra_json_paths = []
+        self.extra_img_paths = []
         self.init_ui()
+
+    def add_extra_json_path(self):
+        paths = QFileDialog.getExistingDirectory(self, '选择额外JSON标注文件夹路径', '', QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks)
+        if paths:
+            self.extra_json_paths.append(paths.replace('\\', '/'))
+            self.extra_json_list.addItem(paths.replace('\\', '/'))
+
+    def add_extra_img_path(self):
+        paths = QFileDialog.getExistingDirectory(self, '选择额外IMAGE图片文件夹路径', '', QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks)
+        if paths:
+            self.extra_img_paths.append(paths.replace('\\', '/'))
+            self.extra_img_list.addItem(paths.replace('\\', '/'))
 
     def choose_json_path(self):
         path = QFileDialog.getExistingDirectory(self, '选择 JSON 标注文件夹路径', '')
@@ -515,6 +530,29 @@ class TrainingInterface(QWidget):
         file_layout.addWidget(save_path_btn, 6, 2)
 
         main_layout.addLayout(file_layout)
+
+        # （新）额外JSON标注文件夹
+        extra_json_layout = QHBoxLayout()
+        extra_json_label = QLabel("额外 JSON 标注文件夹路径:  ")
+        extra_json_layout.addWidget(extra_json_label)
+        self.extra_json_list = QListWidget()
+        self.extra_json_list.setMaximumHeight(60)
+        extra_json_layout.addWidget(self.extra_json_list)
+        add_extra_json_btn = QPushButton("添加")
+        add_extra_json_btn.clicked.connect(self.add_extra_json_path)
+        extra_json_layout.addWidget(add_extra_json_btn)
+        main_layout.addLayout(extra_json_layout)
+        # （新）额外IMAGE图片文件夹
+        extra_img_layout = QHBoxLayout()
+        extra_img_label = QLabel("额外 IMAGE 图片文件夹路径:  ")
+        extra_img_layout.addWidget(extra_img_label)
+        self.extra_img_list = QListWidget()
+        self.extra_img_list.setMaximumHeight(60)
+        extra_img_layout.addWidget(self.extra_img_list)
+        add_extra_img_btn = QPushButton("添加")
+        add_extra_img_btn.clicked.connect(self.add_extra_img_path)
+        extra_img_layout.addWidget(add_extra_img_btn)
+        main_layout.addLayout(extra_img_layout)
 
         # Training parameters
         params_group = QGroupBox("训练参数")
@@ -981,102 +1019,169 @@ class TrainingInterface(QWidget):
                                 f.write(f'{p} ')
                             f.write('\n')
         
-    def split_train_val(self, data_path, val_ratio=0.1, remove_exist=False):
+    # def split_train_val(self, data_path, val_ratio=0.1, remove_exist=False):
 
-        # 在 data_path 目录中根据 val_ratio 比例，创建 yolo 格式的训练文件夹和验证文件夹
-        train_image_path = data_path + '/images/train'
-        train_label_path = data_path + '/labels/train'
-        val_image_path =   data_path + '/images/valid'
-        val_label_path =   data_path + '/labels/valid'
+    #     # 在 data_path 目录中根据 val_ratio 比例，创建 yolo 格式的训练文件夹和验证文件夹
+    #     train_image_path = data_path + '/images/train'
+    #     train_label_path = data_path + '/labels/train'
+    #     val_image_path =   data_path + '/images/valid'
+    #     val_label_path =   data_path + '/labels/valid'
         
-        # 定义数据集路径和划分后的保存路径
-        root_path = data_path  # 原始数据集路径
+    #     # 定义数据集路径和划分后的保存路径
+    #     root_path = data_path  # 原始数据集路径
 
-        print("data_path: ", data_path)
-        print("root_path: ", root_path)
-        print("images_path: ", train_image_path)
-        print("labels_path: ", train_label_path)
-        print("images_path: ", val_image_path)
-        print("labels_path: ", val_label_path)
+    #     print("data_path: ", data_path)
+    #     print("root_path: ", root_path)
+    #     print("images_path: ", train_image_path)
+    #     print("labels_path: ", train_label_path)
+    #     print("images_path: ", val_image_path)
+    #     print("labels_path: ", val_label_path)
 
-        # 创建划分后的目录结构
+    #     # 创建划分后的目录结构
+    #     if remove_exist:
+    #         if os.path.exists(train_image_path):
+    #             shutil.rmtree(train_image_path)
+    #         if os.path.exists(train_label_path):
+    #             shutil.rmtree(train_label_path)
+    #         if os.path.exists(val_image_path):
+    #             shutil.rmtree(val_image_path)
+    #         if os.path.exists(val_label_path):
+    #             shutil.rmtree(val_label_path)
+            
+    #     os.makedirs(train_image_path, exist_ok=False)
+    #     os.makedirs(train_label_path, exist_ok=False)
+    #     os.makedirs(val_image_path, exist_ok=False)
+    #     os.makedirs(val_label_path, exist_ok=False)
+            
+    #     # 获取所有有标注图片文件的文件名
+    #     label_files = []  # 假设标注文件格式为 txt
+    #     image_files = []  # 假设图片格式为 jpg
+        
+    #     sub_folders = []
+    #     for item in os.listdir(root_path):
+    #         if os.path.isdir(os.path.join(root_path, item)):
+    #             sub_folders.append(item)
+    #     sub_folders.append("")
+        
+    #     # 查找指定名称的图片文件（未知后缀）
+    #     def find_image_by_name(folder, basename):
+    #         for fn in os.listdir(folder):
+    #             name, ext = os.path.splitext(fn)
+    #             if name == basename and ext.lower() in [".jpg", ".bmp", ".png", ".tif", ".jpeg", ".gif", ".webp"]:
+    #                 return os.path.join(folder, fn)
+    #         return None
+
+    #     for sub_folder in sub_folders:
+    #         if sub_folder in ["images", "labels"]:
+    #             continue
+    #         source_path = root_path if sub_folder == "" else root_path + '/' + sub_folder
+    #         for f in os.listdir(source_path):
+    #             if f.endswith(".json"):
+    #                 label_files.append(os.path.join(source_path, f.split('.')[0]+'.txt'))
+    #                 image_file = find_image_by_name(source_path, f.split('.')[0])
+    #                 image_files.append(image_file)
+            
+    #         # image_files += [os.path.join(source_path, f) for f in os.listdir(source_path) if f.endswith(".jpg", ".bmp", ".png")]
+    #         # label_files += [os.path.join(source_path, f) for f in os.listdir(source_path) if f.endswith(".txt")]
+        
+    #     # print("label_files: ", label_files)
+    #     # print("image_files: ", image_files)
+        
+    #     # 随机打乱文件列表
+    #     combined = list(zip(image_files, label_files))
+    #     random.shuffle(combined)
+
+    #     # 定义划分比例（例如，90%用于训练，10%用于验证）
+    #     train_ratio = 1 - val_ratio
+    #     train_size = int(train_ratio * len(combined))
+
+    #     # 划分数据集
+    #     train_data = combined[:train_size]
+    #     val_data = combined[train_size:]
+
+    #     # 复制文件到相应的目录
+    #     for img_file, label_file in train_data:
+    #         # print(os.path.join(images_path, img_file), os.path.join(root_path, 'images/train', img_file))
+    #         shutil.copy(img_file, os.path.join(root_path, 'images/train', os.path.basename(img_file)))
+    #         # print(os.path.join(labels_path, label_file), os.path.join(root_path, 'labels/train', label_file))
+    #         shutil.copy(label_file, os.path.join(root_path, 'labels/train', os.path.basename(label_file)))
+
+    #     if val_ratio > 0:
+    #         for img_file, label_file in val_data:
+    #             # print(os.path.join(images_path, img_file), os.path.join(root_path, 'images/val', img_file))
+    #             shutil.copy(img_file, os.path.join(root_path, 'images/valid', os.path.basename(img_file)))
+    #             # print(os.path.join(labels_path, label_file), os.path.join(root_path, 'labels/val', label_file))
+    #             shutil.copy(label_file, os.path.join(root_path, 'labels/valid', os.path.basename(label_file)))
+    #         return 'images/train', 'images/valid'
+    #     else:
+    #         return 'images/train', 'images/train'
+
+    def split_train_val(self, main_img_path, val_ratio=0.1, remove_exist=False):
+        """
+        支持主图片文件夹和额外图片文件夹，合并所有图片和txt标注到主目录下，再划分train/val。
+        """
+        # 1. 收集所有图片和txt标注文件
+        all_img_dirs = [main_img_path] + self.extra_img_paths
+        all_label_dirs = [self.annotation_path.text()] + self.extra_json_paths
+
+        # 2. 目标目录
+        images_root = os.path.join(main_img_path, 'images')
+        labels_root = os.path.join(main_img_path, 'labels')
+        train_image_path = os.path.join(images_root, 'train')
+        train_label_path = os.path.join(labels_root, 'train')
+        val_image_path = os.path.join(images_root, 'valid')
+        val_label_path = os.path.join(labels_root, 'valid')
+
+        # 3. 清理旧目录
         if remove_exist:
-            if os.path.exists(train_image_path):
-                shutil.rmtree(train_image_path)
-            if os.path.exists(train_label_path):
-                shutil.rmtree(train_label_path)
-            if os.path.exists(val_image_path):
-                shutil.rmtree(val_image_path)
-            if os.path.exists(val_label_path):
-                shutil.rmtree(val_label_path)
-            
-        os.makedirs(train_image_path, exist_ok=False)
-        os.makedirs(train_label_path, exist_ok=False)
-        os.makedirs(val_image_path, exist_ok=False)
-        os.makedirs(val_label_path, exist_ok=False)
-            
-        # 获取所有有标注图片文件的文件名
-        label_files = []  # 假设标注文件格式为 txt
-        image_files = []  # 假设图片格式为 jpg
-        
-        sub_folders = []
-        for item in os.listdir(root_path):
-            if os.path.isdir(os.path.join(root_path, item)):
-                sub_folders.append(item)
-        sub_folders.append("")
-        
-        # 查找指定名称的图片文件（未知后缀）
+            for p in [train_image_path, train_label_path, val_image_path, val_label_path]:
+                if os.path.exists(p):
+                    shutil.rmtree(p)
+        for p in [train_image_path, train_label_path, val_image_path, val_label_path]:
+            os.makedirs(p, exist_ok=True)
+
+        # 4. 合并所有图片和txt标注（只处理有txt的图片）
+        img_label_pairs = []
+        exts = [".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".gif", ".webp"]
+
         def find_image_by_name(folder, basename):
             for fn in os.listdir(folder):
                 name, ext = os.path.splitext(fn)
-                if name == basename and ext.lower() in [".jpg", ".bmp", ".png", ".tif", ".jpeg", ".gif", ".webp"]:
+                if name == basename and ext.lower() in exts:
                     return os.path.join(folder, fn)
             return None
 
-        for sub_folder in sub_folders:
-            if sub_folder in ["images", "labels"]:
+        # 遍历所有图片文件夹和标注文件夹
+        for img_dir, label_dir in zip(all_img_dirs, all_label_dirs):
+            if not os.path.exists(img_dir) or not os.path.exists(label_dir):
                 continue
-            source_path = root_path if sub_folder == "" else root_path + '/' + sub_folder
-            for f in os.listdir(source_path):
-                if f.endswith(".json"):
-                    label_files.append(os.path.join(source_path, f.split('.')[0]+'.txt'))
-                    image_file = find_image_by_name(source_path, f.split('.')[0])
-                    image_files.append(image_file)
-            
-            # image_files += [os.path.join(source_path, f) for f in os.listdir(source_path) if f.endswith(".jpg", ".bmp", ".png")]
-            # label_files += [os.path.join(source_path, f) for f in os.listdir(source_path) if f.endswith(".txt")]
-        
-        # print("label_files: ", label_files)
-        # print("image_files: ", image_files)
-        
-        # 随机打乱文件列表
-        combined = list(zip(image_files, label_files))
-        random.shuffle(combined)
+            for file in os.listdir(img_dir):
+                name, ext = os.path.splitext(file)
+                if ext.lower() not in exts:
+                    continue
+                img_path = os.path.join(img_dir, file)
+                txt_path = os.path.join(img_dir, name + ".txt")
+                # 优先找标注文件夹下的txt
+                if not os.path.exists(txt_path):
+                    txt_path = os.path.join(label_dir, name + ".txt")
+                if os.path.exists(txt_path):
+                    img_label_pairs.append((img_path, txt_path))
 
-        # 定义划分比例（例如，90%用于训练，10%用于验证）
-        train_ratio = 1 - val_ratio
-        train_size = int(train_ratio * len(combined))
+        # 5. 随机划分
+        random.shuffle(img_label_pairs)
+        train_size = int((1 - val_ratio) * len(img_label_pairs))
+        train_data = img_label_pairs[:train_size]
+        val_data = img_label_pairs[train_size:]
 
-        # 划分数据集
-        train_data = combined[:train_size]
-        val_data = combined[train_size:]
-
-        # 复制文件到相应的目录
+        # 6. 拷贝到目标目录
         for img_file, label_file in train_data:
-            # print(os.path.join(images_path, img_file), os.path.join(root_path, 'images/train', img_file))
-            shutil.copy(img_file, os.path.join(root_path, 'images/train', os.path.basename(img_file)))
-            # print(os.path.join(labels_path, label_file), os.path.join(root_path, 'labels/train', label_file))
-            shutil.copy(label_file, os.path.join(root_path, 'labels/train', os.path.basename(label_file)))
+            shutil.copy(img_file, os.path.join(train_image_path, os.path.basename(img_file)))
+            shutil.copy(label_file, os.path.join(train_label_path, os.path.basename(label_file)))
+        for img_file, label_file in val_data:
+            shutil.copy(img_file, os.path.join(val_image_path, os.path.basename(img_file)))
+            shutil.copy(label_file, os.path.join(val_label_path, os.path.basename(label_file)))
 
-        if val_ratio > 0:
-            for img_file, label_file in val_data:
-                # print(os.path.join(images_path, img_file), os.path.join(root_path, 'images/val', img_file))
-                shutil.copy(img_file, os.path.join(root_path, 'images/valid', os.path.basename(img_file)))
-                # print(os.path.join(labels_path, label_file), os.path.join(root_path, 'labels/val', label_file))
-                shutil.copy(label_file, os.path.join(root_path, 'labels/valid', os.path.basename(label_file)))
-            return 'images/train', 'images/valid'
-        else:
-            return 'images/train', 'images/train'
+        return 'images/train', 'images/valid' if val_ratio > 0 else 'images/train'
 
     def generate_dataset_yaml(self, dataset_path, train_folder, val_folder, labels_dict, output_file):
         """
@@ -1133,8 +1238,21 @@ class TrainingInterface(QWidget):
             return
         self.update_progress(0)
         self.update_log("将 Labelme 的 JSON 标注转换成 YOLO 的 txt 标注...")
-        # 获取所有标签
-        unique_labels, labels_dict = self.find_unique_labels_in_directory(self.annotation_path.text())
+        # （旧）获取所有标签
+        # unique_labels, labels_dict = self.find_unique_labels_in_directory(self.annotation_path.text())
+
+        # （新）合并主文件夹和所有额外文件夹
+        all_json_dirs = [self.annotation_path.text()] + self.extra_json_paths
+        all_img_dirs = [self.img_path.text()] + self.extra_img_paths
+        # （新）合并所有unique_labels
+        unique_labels = set()
+        labels_dict = {}
+        for json_dir in all_json_dirs:
+            if os.path.exists(json_dir):
+                u, d = self.find_unique_labels_in_directory(json_dir)
+                unique_labels.update(u)
+                labels_dict.update(d)
+
         print("唯一标签: ", unique_labels)
         print("标签字典: ", labels_dict)
         
@@ -1157,11 +1275,23 @@ class TrainingInterface(QWidget):
             reserved_labels_dict[nl] = i
         print("选择的标签字典: ", reserved_labels_dict)
         
-        self.convert_json2txt(anno_dir=self.annotation_path.text(), 
-                              image_dir=self.img_path.text(), 
-                              class_map=reserved_labels_dict,
-                              needed_labels=needed_labels)
+        # （旧）转换 json 到 yolo 格式的 txt 文件
+        # self.convert_json2txt(anno_dir=self.annotation_path.text(), 
+        #                       image_dir=self.img_path.text(), 
+        #                       class_map=reserved_labels_dict,
+        #                       needed_labels=needed_labels)
         # cfg_path = os.path.join("./cfgs", f"{os.path.basename(self.save_path.text())}.yaml")
+        # （新）逐个文件夹转换
+        print(all_json_dirs)
+        print(all_img_dirs)
+        for json_dir, img_dir in zip(all_json_dirs, all_img_dirs):
+            if os.path.exists(json_dir) and os.path.exists(img_dir):
+                self.convert_json2txt(
+                    anno_dir=json_dir,
+                    image_dir=img_dir,
+                    class_map=reserved_labels_dict,
+                    needed_labels=needed_labels
+                )
         
         self.update_progress(60)
         
