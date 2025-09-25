@@ -384,14 +384,46 @@ class TrainingInterface(QWidget):
     def add_extra_json_path(self):
         paths = QFileDialog.getExistingDirectory(self, '选择额外JSON标注文件夹路径', '', QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks)
         if paths:
-            self.extra_json_paths.append(paths.replace('\\', '/'))
-            self.extra_json_list.addItem(paths.replace('\\', '/'))
+            path = paths.replace('\\', '/')
+            if path not in self.extra_json_paths:
+                self.extra_json_paths.append(path)
+                item = QListWidgetItem(path)
+                self.extra_json_list.addItem(item)
 
     def add_extra_img_path(self):
         paths = QFileDialog.getExistingDirectory(self, '选择额外IMAGE图片文件夹路径', '', QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks)
         if paths:
-            self.extra_img_paths.append(paths.replace('\\', '/'))
-            self.extra_img_list.addItem(paths.replace('\\', '/'))
+            path = paths.replace('\\', '/')
+            if path not in self.extra_img_paths:
+                self.extra_img_paths.append(path)
+                item = QListWidgetItem(path)
+                self.extra_img_list.addItem(item)
+
+    def remove_selected_extra_json_path(self):
+        row = self.extra_json_list.currentRow()
+        if row >= 0:
+            self.extra_json_paths.pop(row)
+            self.extra_json_list.takeItem(row)
+
+    def remove_selected_extra_img_path(self):
+        row = self.extra_img_list.currentRow()
+        if row >= 0:
+            self.extra_img_paths.pop(row)
+            self.extra_img_list.takeItem(row)
+
+    def show_extra_json_context_menu(self, pos):
+        menu = QMenu(self)
+        remove_action = menu.addAction("删除所选路径")
+        action = menu.exec_(self.extra_json_list.mapToGlobal(pos))
+        if action == remove_action:
+            self.remove_selected_extra_json_path()
+
+    def show_extra_img_context_menu(self, pos):
+        menu = QMenu(self)
+        remove_action = menu.addAction("删除所选路径")
+        action = menu.exec_(self.extra_img_list.mapToGlobal(pos))
+        if action == remove_action:
+            self.remove_selected_extra_img_path()
 
     def choose_json_path(self):
         path = QFileDialog.getExistingDirectory(self, '选择 JSON 标注文件夹路径', '')
@@ -532,27 +564,33 @@ class TrainingInterface(QWidget):
         main_layout.addLayout(file_layout)
 
         # （新）额外JSON标注文件夹
-        extra_json_layout = QHBoxLayout()
-        extra_json_label = QLabel("额外 JSON 标注文件夹路径:  ")
-        extra_json_layout.addWidget(extra_json_label)
+        file_layout = QGridLayout()
+        # extra_json_layout = QHBoxLayout()
+        extra_json_label = QLabel("额外 JSON 标注文件夹路径:")
+        file_layout.addWidget(extra_json_label, 0, 0)
         self.extra_json_list = QListWidget()
-        self.extra_json_list.setMaximumHeight(60)
-        extra_json_layout.addWidget(self.extra_json_list)
+        self.extra_json_list.setMaximumHeight(80)
+        self.extra_json_list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.extra_json_list.customContextMenuRequested.connect(self.show_extra_json_context_menu)
+        file_layout.addWidget(self.extra_json_list, 0, 1)
         add_extra_json_btn = QPushButton("添加")
         add_extra_json_btn.clicked.connect(self.add_extra_json_path)
-        extra_json_layout.addWidget(add_extra_json_btn)
-        main_layout.addLayout(extra_json_layout)
+        file_layout.addWidget(add_extra_json_btn, 0, 2)
+        # main_layout.addLayout(extra_json_layout)
+
         # （新）额外IMAGE图片文件夹
-        extra_img_layout = QHBoxLayout()
-        extra_img_label = QLabel("额外 IMAGE 图片文件夹路径:  ")
-        extra_img_layout.addWidget(extra_img_label)
+        # extra_img_layout = QHBoxLayout()
+        extra_img_label = QLabel("额外 IMAGE 图片文件夹路径:")
+        file_layout.addWidget(extra_img_label, 1, 0)
         self.extra_img_list = QListWidget()
-        self.extra_img_list.setMaximumHeight(60)
-        extra_img_layout.addWidget(self.extra_img_list)
+        self.extra_img_list.setMaximumHeight(80)
+        self.extra_img_list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.extra_img_list.customContextMenuRequested.connect(self.show_extra_img_context_menu)
+        file_layout.addWidget(self.extra_img_list, 1, 1)
         add_extra_img_btn = QPushButton("添加")
         add_extra_img_btn.clicked.connect(self.add_extra_img_path)
-        extra_img_layout.addWidget(add_extra_img_btn)
-        main_layout.addLayout(extra_img_layout)
+        file_layout.addWidget(add_extra_img_btn, 1, 2)
+        main_layout.addLayout(file_layout)
 
         # Training parameters
         params_group = QGroupBox("训练参数")
