@@ -11,3 +11,7 @@ conda env export -n pytorch_env > pytorch.yml
 
 # conda环境创建
 conda env create -f conda_environment.yml
+
+# 查询 ECC 情况
+nvidia-smi dmon -s et -d 10 -o DT
+nvidia-smi -q -d PAGE_RETIREMENT
