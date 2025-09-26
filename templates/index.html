@@ -267,12 +267,26 @@
                 .done(function(data) {
                     currentModel = modelName;
                     
-                    // 显示模型参数
-                    if (data.args && typeof data.args === 'object' && Object.keys(data.args).length > 0) {
-                        $('#modelArgs').text(JSON.stringify(data.args, null, 2));
+                    // 显示模型参数 - 改进的显示逻辑
+                    let argsHtml = '';
+                    if (data.args && typeof data.args === 'object') {
+                        if (data.args.error) {
+                            argsHtml = `<p class="text-danger">参数文件错误: ${data.args.error}</p>`;
+                        } else if (data.args.info) {
+                            argsHtml = `<p class="text-info">${data.args.info}</p>`;
+                            // 显示推断的信息
+                            if (Object.keys(data.args).length > 1) {
+                                argsHtml += '<h6>推断的模型信息:</h6>';
+                                argsHtml += '<pre class="bg-light p-2">' + JSON.stringify(data.args, null, 2) + '</pre>';
+                            }
+                        } else {
+                            // 正常显示参数
+                            argsHtml = '<pre class="bg-light p-3">' + JSON.stringify(data.args, null, 2) + '</pre>';
+                        }
                     } else {
-                        $('#modelArgs').text('无参数信息或参数文件格式不正确');
+                        argsHtml = '<p class="text-warning">无参数信息或参数格式不正确</p>';
                     }
+                    $('#modelArgs').html(argsHtml);
                     
                     // 显示评估指标图像
                     displayModelMetrics(data.metrics_images, modelName);
@@ -358,7 +372,7 @@
             $('#metricModal').modal('show');
         }
 
-        // 加载选中的模型
+        // 修复加载模型的请求
         function loadSelectedModel() {
             if (!currentModel) {
                 alert('请先选择模型');
@@ -367,15 +381,21 @@
             
             showLoading();
             
-            $.post(`/api/model/${currentModel}/load`)
-                .done(function(data) {
+            // 使用正确的AJAX格式
+            $.ajax({
+                url: `/api/model/${currentModel}/load`,
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({}), // 空数据但确保格式正确
+                success: function(data) {
                     alert(data.message);
                     $('#inferBtn').prop('disabled', false);
-                })
-                .fail(function(xhr) {
-                    alert('加载模型失败: ' + xhr.responseJSON?.error);
-                })
-                .always(hideLoading);
+                },
+                error: function(xhr) {
+                    alert('加载模型失败: ' + (xhr.responseJSON?.error || xhr.statusText));
+                },
+                complete: hideLoading
+            });
         }
 
         // 上传文件
@@ -409,7 +429,7 @@
             });
         }
 
-        // 加载示例图像
+        // 修改示例图像加载函数，添加错误处理
         function loadSampleImages() {
             if (!currentModel) {
                 alert('请先选择模型');
@@ -420,10 +440,16 @@
             
             $.get(`/api/sample_images/${currentModel}`)
                 .done(function(data) {
-                    displayImages(data.images);
+                    if (data.images && data.images.length > 0) {
+                        displayImages(data.images);
+                    } else {
+                        $('#imagePreview').html('<p class="text-warning text-center">未找到示例图像</p>');
+                        alert('该模型没有找到示例图像。请检查模型文件夹中是否有图像文件。');
+                    }
                 })
                 .fail(function(xhr) {
                     alert('加载示例图像失败: ' + xhr.responseJSON?.error);
+                    $('#imagePreview').html('<p class="text-danger text-center">加载示例图像失败</p>');
                 })
                 .always(hideLoading);
         }
@@ -493,33 +519,39 @@
             updateImageButtons();
         }
 
-        // 保存选中图像
+        // 修复保存图像的请求
         function saveSelectedImages() {
             showLoading();
             
-            // 这里简化处理，只保存第一张图像
             if (selectedImages.length > 0) {
                 const img = selectedImages[0];
-                $.post('/api/save_image', {
-                    image_url: img.url,
-                    filename: img.filename
-                })
-                .done(function(data) {
-                    alert('图像保存成功');
-                    // 创建下载链接
-                    const link = document.createElement('a');
-                    link.href = data.download_url;
-                    link.download = img.filename;
-                    link.click();
-                })
-                .fail(function(xhr) {
-                    alert('保存失败: ' + xhr.responseJSON?.error);
-                })
-                .always(hideLoading);
+                $.ajax({
+                    url: '/api/save_image',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        image_url: img.url,
+                        filename: img.filename
+                    }),
+                    success: function(data) {
+                        alert('图像保存成功');
+                        // 创建下载链接
+                        const link = document.createElement('a');
+                        link.href = data.download_url;
+                        link.download = img.filename;
+                        link.click();
+                    },
+                    error: function(xhr) {
+                        alert('保存失败: ' + (xhr.responseJSON?.error || xhr.statusText));
+                    },
+                    complete: hideLoading
+                });
+            } else {
+                hideLoading();
             }
         }
 
-        // 执行推理
+        // 在推理函数中添加调试信息
         function runInference() {
             if (selectedImages.length === 0) {
                 alert('请选择图像');
@@ -527,27 +559,52 @@
             }
             
             const imageUrl = selectedImages[0].url;
-            const imagePath = imageUrl.replace('/static/', 'static/');
+            let imagePath = imageUrl;
+            if (imageUrl.startsWith('/static/')) {
+                imagePath = imageUrl.substring(1);
+            }
             
-            const parameters = {
-                conf: parseFloat($('#confThreshold').val()),
-                iou: parseFloat($('#iouThreshold').val()),
-                imgsz: parseInt($('#imageSize').val())
-            };
+            console.log('推理请求数据:', {
+                image_path: imagePath,
+                image_url: imageUrl,
+                parameters: {
+                    conf: parseFloat($('#confThreshold').val()),
+                    iou: parseFloat($('#iouThreshold').val()),
+                    imgsz: parseInt($('#imageSize').val())
+                }
+            });
             
+            // 其余代码保持不变...
             showLoading();
             
-            $.post('/api/infer', {
-                image_path: imagePath,
-                parameters: parameters
-            })
-            .done(function(data) {
-                displayResults(data);
-            })
-            .fail(function(xhr) {
-                alert('推理失败: ' + xhr.responseJSON?.error);
-            })
-            .always(hideLoading);
+            $.ajax({
+                url: '/api/infer',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    image_path: imagePath,
+                    parameters: {
+                        conf: parseFloat($('#confThreshold').val()),
+                        iou: parseFloat($('#iouThreshold').val()),
+                        imgsz: parseInt($('#imageSize').val())
+                    }
+                }),
+                success: function(data) {
+                    console.log('推理响应:', data);
+                    displayResults(data);
+                },
+                error: function(xhr) {
+                    console.error('推理错误详情:', xhr);
+                    let errorMsg = '推理失败';
+                    if (xhr.responseJSON && xhr.responseJSON.error) {
+                        errorMsg += ': ' + xhr.responseJSON.error;
+                    } else {
+                        errorMsg += ' (状态: ' + xhr.status + ')';
+                    }
+                    alert(errorMsg);
+                },
+                complete: hideLoading
+            });
         }
 
         // 显示推理结果
