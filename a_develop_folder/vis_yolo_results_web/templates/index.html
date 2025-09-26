@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YOLO模型推理系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .model-card { transition: all 0.3s; }
+        .model-card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .image-thumbnail { cursor: pointer; transition: all 0.3s; border: 2px solid transparent; }
+        .image-thumbnail:hover { transform: scale(1.05); }
+        .image-thumbnail.selected { border-color: #007bff; }
+        .preview-area { min-height: 300px; border: 2px dashed #dee2e6; border-radius: 5px; }
+        .metrics-image { max-width: 100%; height: auto; }
+        .modal-image { max-width: 100%; cursor: move; }
+        #imageModal .modal-dialog { max-width: 90%; }
+        .loading { display: none; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-robot"></i> YOLO模型推理系统
+            </a>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- 模型选择区域 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-cube"></i> 模型选择</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="input-group mb-3">
+                            <input type="text" class="form-control" id="modelKeyword" placeholder="输入关键字筛选模型...">
+                            <button class="btn btn-outline-secondary" type="button" id="searchModels">
+                                <i class="fas fa-search"></i> 搜索
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <select class="form-select" id="modelSelect">
+                            <option value="">-- 选择模型 --</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div id="modelInfo" class="mt-3" style="display: none;">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>模型参数</h6>
+                            <pre id="modelArgs" class="bg-light p-3"></pre>
+                        </div>
+                        <!-- 替换原有的评估指标显示部分 -->
+                        <div class="col-md-6">
+                            <h6>评估指标</h6>
+                            <div id="modelMetrics" class="row">
+                                <!-- 评估图像将通过JavaScript动态加载 -->
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-success" id="loadModel">
+                        <i class="fas fa-plug"></i> 加载模型
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 图像上传和选择区域 -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-upload"></i> 上传图像</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <input type="file" class="form-control" id="fileUpload" multiple accept="image/*">
+                        </div>
+                        <button class="btn btn-outline-primary mb-3" id="uploadBtn">
+                            <i class="fas fa-upload"></i> 上传选中文件
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-images"></i> 示例图像</h5>
+                    </div>
+                    <div class="card-body">
+                        <button class="btn btn-outline-info" id="loadSamples">
+                            <i class="fas fa-sync"></i> 加载示例图像
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 图像预览区域 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-eye"></i> 图像预览</h5>
+            </div>
+            <div class="card-body">
+                <div class="preview-area p-3" id="imagePreview">
+                    <p class="text-muted text-center">暂无图像</p>
+                </div>
+                <div class="mt-3">
+                    <button class="btn btn-danger" id="deleteSelected" disabled>
+                        <i class="fas fa-trash"></i> 删除选中
+                    </button>
+                    <button class="btn btn-success" id="saveSelected" disabled>
+                        <i class="fas fa-save"></i> 保存选中
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 推理参数设置 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-cog"></i> 推理参数</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <label class="form-label">置信度阈值</label>
+                        <input type="number" class="form-control" id="confThreshold" value="0.25" step="0.01" min="0" max="1">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">IoU阈值</label>
+                        <input type="number" class="form-control" id="iouThreshold" value="0.45" step="0.01" min="0" max="1">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">图像尺寸</label>
+                        <input type="number" class="form-control" id="imageSize" value="640" min="320" max="1280">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">&nbsp;</label>
+                        <button class="btn btn-primary w-100" id="inferBtn" disabled>
+                            <i class="fas fa-play"></i> 开始推理
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 推理结果 -->
+        <div class="card mb-4" id="resultSection" style="display: none;">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-bar"></i> 推理结果</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <img id="resultImage" class="img-fluid" src="" alt="推理结果">
+                    </div>
+                    <div class="col-md-6">
+                        <div id="resultInfo"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 图像预览模态框 -->
+    <div class="modal fade" id="imageModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">图像预览</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img src="" class="modal-image" id="modalImage">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 加载指示器 -->
+    <div class="loading" id="loading">
+        <div class="d-flex justify-content-center align-items-center" style="height: 200px;">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">加载中...</span>
+            </div>
+            <span class="ms-3">处理中...</span>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        // 全局变量
+        let selectedImages = [];
+        let currentModel = null;
+
+        // 初始化
+        $(document).ready(function() {
+            loadModels();
+            
+            // 模型搜索
+            $('#searchModels').click(loadModels);
+            $('#modelKeyword').keypress(function(e) {
+                if (e.which === 13) loadModels();
+            });
+            
+            // 模型选择变化
+            $('#modelSelect').change(function() {
+                const modelName = $(this).val();
+                if (modelName) {
+                    loadModelDetails(modelName);
+                } else {
+                    $('#modelInfo').hide();
+                }
+            });
+            
+            // 加载模型
+            $('#loadModel').click(loadSelectedModel);
+            
+            // 上传文件
+            $('#uploadBtn').click(uploadFiles);
+            
+            // 加载示例图像
+            $('#loadSamples').click(loadSampleImages);
+            
+            // 图像操作
+            $('#deleteSelected').click(deleteSelectedImages);
+            $('#saveSelected').click(saveSelectedImages);
+            
+            // 推理按钮
+            $('#inferBtn').click(runInference);
+        });
+
+        // 加载模型列表
+        function loadModels() {
+            const keyword = $('#modelKeyword').val();
+            showLoading();
+            
+            $.get('/api/models', { keyword: keyword })
+                .done(function(data) {
+                    const select = $('#modelSelect');
+                    select.empty().append('<option value="">-- 选择模型 --</option>');
+                    
+                    data.models.forEach(model => {
+                        select.append(`<option value="${model.name}">${model.name}</option>`);
+                    });
+                })
+                .fail(function(xhr) {
+                    alert('加载模型列表失败: ' + xhr.responseJSON?.error);
+                })
+                .always(hideLoading);
+        }
+
+        // 修改加载模型详情的函数
+        function loadModelDetails(modelName) {
+            showLoading();
+            
+            $.get(`/api/model/${modelName}`)
+                .done(function(data) {
+                    currentModel = modelName;
+                    
+                    // 显示模型参数
+                    if (data.args && typeof data.args === 'object' && Object.keys(data.args).length > 0) {
+                        $('#modelArgs').text(JSON.stringify(data.args, null, 2));
+                    } else {
+                        $('#modelArgs').text('无参数信息或参数文件格式不正确');
+                    }
+                    
+                    // 显示评估指标图像
+                    displayModelMetrics(data.metrics_images, modelName);
+                    
+                    $('#modelInfo').show();
+                })
+                .fail(function(xhr) {
+                    alert('加载模型详情失败: ' + xhr.responseJSON?.error);
+                })
+                .always(hideLoading);
+        }
+
+        // 新增函数：显示评估指标图像
+        function displayModelMetrics(metricsImages, modelName) {
+            const metricsContainer = $('#modelMetrics');
+            
+            if (!metricsImages || Object.keys(metricsImages).length === 0) {
+                metricsContainer.html('<p class="text-muted">未找到评估指标图像</p>');
+                return;
+            }
+            
+            let html = '';
+            const metricTitles = {
+                'confusion_matrix': '混淆矩阵',
+                'precision_recall': '精确率-召回率曲线',
+                'f1_curve': 'F1分数曲线',
+                'results': '训练结果',
+                'labels': '标签分布',
+                'val_batch_pred': '验证集预测结果',
+                'val_batch_labels': '验证集真实标签'
+            };
+            
+            Object.keys(metricsImages).forEach(metricType => {
+                const imageUrl = `/api/model_image/${modelName}/${metricType}`;
+                const title = metricTitles[metricType] || metricType;
+                
+                html += `
+                    <div class="col-md-6 mb-3">
+                        <div class="card">
+                            <div class="card-header py-2">
+                                <h6 class="mb-0">${title}</h6>
+                            </div>
+                            <div class="card-body p-2 text-center">
+                                <img src="${imageUrl}" 
+                                    class="metrics-image img-fluid" 
+                                    style="max-height: 200px; cursor: pointer;"
+                                    onclick="openMetricImage('${imageUrl}', '${title}')"
+                                    onerror="this.style.display='none'"
+                                    alt="${title}">
+                                <small class="text-muted">点击查看大图</small>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            metricsContainer.html(`<div class="row">${html}</div>`);
+        }
+
+        // 新增函数：打开评估指标大图
+        function openMetricImage(imageUrl, title) {
+            const modalHtml = `
+                <div class="modal fade" id="metricModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">${title}</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body text-center">
+                                <img src="${imageUrl}" class="img-fluid">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // 移除已存在的模态框
+            $('#metricModal').remove();
+            
+            // 添加新的模态框并显示
+            $('body').append(modalHtml);
+            $('#metricModal').modal('show');
+        }
+
+        // 加载选中的模型
+        function loadSelectedModel() {
+            if (!currentModel) {
+                alert('请先选择模型');
+                return;
+            }
+            
+            showLoading();
+            
+            $.post(`/api/model/${currentModel}/load`)
+                .done(function(data) {
+                    alert(data.message);
+                    $('#inferBtn').prop('disabled', false);
+                })
+                .fail(function(xhr) {
+                    alert('加载模型失败: ' + xhr.responseJSON?.error);
+                })
+                .always(hideLoading);
+        }
+
+        // 上传文件
+        function uploadFiles() {
+            const files = $('#fileUpload')[0].files;
+            if (files.length === 0) {
+                alert('请选择文件');
+                return;
+            }
+            
+            const formData = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                formData.append('files[]', files[i]);
+            }
+            
+            showLoading();
+            
+            $.ajax({
+                url: '/api/upload',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    displayImages(data.files);
+                },
+                error: function(xhr) {
+                    alert('上传失败: ' + xhr.responseJSON?.error);
+                },
+                complete: hideLoading
+            });
+        }
+
+        // 加载示例图像
+        function loadSampleImages() {
+            if (!currentModel) {
+                alert('请先选择模型');
+                return;
+            }
+            
+            showLoading();
+            
+            $.get(`/api/sample_images/${currentModel}`)
+                .done(function(data) {
+                    displayImages(data.images);
+                })
+                .fail(function(xhr) {
+                    alert('加载示例图像失败: ' + xhr.responseJSON?.error);
+                })
+                .always(hideLoading);
+        }
+
+        // 显示图像
+        function displayImages(images) {
+            const preview = $('#imagePreview');
+            
+            if (images.length === 0) {
+                preview.html('<p class="text-muted text-center">暂无图像</p>');
+                return;
+            }
+            
+            let html = '<div class="row">';
+            images.forEach(img => {
+                html += `
+                    <div class="col-md-2 mb-3">
+                        <div class="image-thumbnail" data-filename="${img.filename}" data-url="${img.url}">
+                            <img src="${img.url}" class="img-fluid" style="height: 100px; object-fit: cover;">
+                            <small class="d-block">${img.filename}</small>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            preview.html(html);
+            
+            // 添加点击事件
+            $('.image-thumbnail').click(function() {
+                const filename = $(this).data('filename');
+                const url = $(this).data('url');
+                
+                if ($(this).hasClass('selected')) {
+                    $(this).removeClass('selected');
+                    selectedImages = selectedImages.filter(img => img.filename !== filename);
+                } else {
+                    $(this).addClass('selected');
+                    selectedImages.push({ filename, url });
+                }
+                
+                updateImageButtons();
+            });
+            
+            // 添加双击事件查看大图
+            $('.image-thumbnail img').dblclick(function() {
+                const imgUrl = $(this).attr('src');
+                $('#modalImage').attr('src', imgUrl);
+                $('#imageModal').modal('show');
+            });
+        }
+
+        // 更新图像操作按钮状态
+        function updateImageButtons() {
+            const hasSelection = selectedImages.length > 0;
+            $('#deleteSelected').prop('disabled', !hasSelection);
+            $('#saveSelected').prop('disabled', !hasSelection);
+            $('#inferBtn').prop('disabled', selectedImages.length === 0);
+        }
+
+        // 删除选中图像
+        function deleteSelectedImages() {
+            selectedImages.forEach(img => {
+                $(`.image-thumbnail[data-filename="${img.filename}"]`).remove();
+            });
+            selectedImages = [];
+            updateImageButtons();
+        }
+
+        // 保存选中图像
+        function saveSelectedImages() {
+            showLoading();
+            
+            // 这里简化处理，只保存第一张图像
+            if (selectedImages.length > 0) {
+                const img = selectedImages[0];
+                $.post('/api/save_image', {
+                    image_url: img.url,
+                    filename: img.filename
+                })
+                .done(function(data) {
+                    alert('图像保存成功');
+                    // 创建下载链接
+                    const link = document.createElement('a');
+                    link.href = data.download_url;
+                    link.download = img.filename;
+                    link.click();
+                })
+                .fail(function(xhr) {
+                    alert('保存失败: ' + xhr.responseJSON?.error);
+                })
+                .always(hideLoading);
+            }
+        }
+
+        // 执行推理
+        function runInference() {
+            if (selectedImages.length === 0) {
+                alert('请选择图像');
+                return;
+            }
+            
+            const imageUrl = selectedImages[0].url;
+            const imagePath = imageUrl.replace('/static/', 'static/');
+            
+            const parameters = {
+                conf: parseFloat($('#confThreshold').val()),
+                iou: parseFloat($('#iouThreshold').val()),
+                imgsz: parseInt($('#imageSize').val())
+            };
+            
+            showLoading();
+            
+            $.post('/api/infer', {
+                image_path: imagePath,
+                parameters: parameters
+            })
+            .done(function(data) {
+                displayResults(data);
+            })
+            .fail(function(xhr) {
+                alert('推理失败: ' + xhr.responseJSON?.error);
+            })
+            .always(hideLoading);
+        }
+
+        // 显示推理结果
+        function displayResults(data) {
+            $('#resultImage').attr('src', data.result_image);
+            
+            let infoHtml = `
+                <h6>推理信息</h6>
+                <p><strong>推理时间:</strong> ${data.inference_time}秒</p>
+                <p><strong>图像尺寸:</strong> ${data.image_size}</p>
+                <p><strong>检测数量:</strong> ${data.detection_count}</p>
+            `;
+            
+            if (data.detections && data.detections.length > 0) {
+                infoHtml += `<h6 class="mt-3">检测结果</h6>`;
+                data.detections.forEach((det, index) => {
+                    infoHtml += `
+                        <div class="border-bottom pb-2 mb-2">
+                            <p><strong>目标 ${index + 1}:</strong> ${det.class}</p>
+                            <p><strong>置信度:</strong> ${(det.confidence * 100).toFixed(2)}%</p>
+                        </div>
+                    `;
+                });
+            }
+            
+            $('#resultInfo').html(infoHtml);
+            $('#resultSection').show();
+        }
+
+        // 显示/隐藏加载指示器
+        function showLoading() {
+            $('#loading').show();
+        }
+
+        function hideLoading() {
+            $('#loading').hide();
+        }
+
+        // 图像模态框的缩放和拖拽功能
+        let scale = 1;
+        let isDragging = false;
+        let startX, startY, translateX = 0, translateY = 0;
+
+        $('#imageModal').on('shown.bs.modal', function() {
+            const modalImage = $('#modalImage')[0];
+            scale = 1;
+            translateX = 0;
+            translateY = 0;
+            updateImageTransform();
+            
+            // 鼠标滚轮缩放
+            $(this).on('wheel', function(e) {
+                e.preventDefault();
+                const delta = e.originalEvent.deltaY > 0 ? -0.1 : 0.1;
+                scale = Math.max(0.1, Math.min(5, scale + delta));
+                updateImageTransform();
+            });
+            
+            // 鼠标拖拽
+            modalImage.addEventListener('mousedown', startDrag);
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', stopDrag);
+        });
+
+        function startDrag(e) {
+            isDragging = true;
+            startX = e.clientX - translateX;
+            startY = e.clientY - translateY;
+        }
+
+        function drag(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+            translateX = e.clientX - startX;
+            translateY = e.clientY - startY;
+            updateImageTransform();
+        }
+
+        function stopDrag() {
+            isDragging = false;
+        }
+
+        function updateImageTransform() {
+            $('#modalImage').css('transform', `translate(${translateX}px, ${translateY}px) scale(${scale})`);
+        }
+    </script>
+</body>
+</html>
