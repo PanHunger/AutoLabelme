@@ -1,4 +1,5 @@
 import os
+import re  # 引入正则表达式模块
 import yaml
 import glob
 import json
@@ -326,13 +327,13 @@ class YOLOModelManager:
         
         # 定义评估图像类型和可能的文件名模式
         metric_patterns = {
-            'confusion_matrix': ['confusion_matrix', 'confusion', 'cm'],
-            'precision_recall': ['precision_recall', 'pr_curve', 'precision-recall'],
-            'f1_curve': ['f1_curve', 'f1_curve', 'f1-score'],
-            'results': ['results', 'metrics', 'training_results'],
-            'labels': ['labels', 'detections'],
-            'val_batch_pred': ['val_batch_pred', 'validation_predictions'],
-            'val_batch_labels': ['val_batch_labels', 'validation_labels']
+            'confusion_matrix': ['confusion_matrix_normalized'],
+            'precision_recall': ['pr_curve'],
+            # 'f1_curve': ['F1_curve'],
+            'results': ['results'],
+            'labels': ['labels'],
+            'val_batch_pred': ['val_batch0_pred'],
+            'val_batch_labels': ['val_batch0_labels']
         }
         
         # 递归查找所有图像文件
@@ -345,7 +346,9 @@ class YOLOModelManager:
         # 匹配评估图像
         for metric_name, patterns in metric_patterns.items():
             for pattern in patterns:
-                matched_files = [f for f in all_image_files if pattern in os.path.basename(f).lower()]
+                # 使用正则表达式进行严格匹配
+                regex = re.compile(rf"^{pattern}(\.[a-zA-Z0-9]+)?$", re.IGNORECASE)
+                matched_files = [f for f in all_image_files if regex.match(os.path.basename(f))]
                 if matched_files:
                     # 选择最匹配的文件（通常是最大的文件）
                     matched_files.sort(key=lambda x: os.path.getsize(x), reverse=True)
