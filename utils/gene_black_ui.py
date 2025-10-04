@@ -27,7 +27,7 @@ class Rectangle:
     def to_dict(self):
         # 转换为JSON格式
         return {
-            "label": "bad",
+            "label": "defect",
             "points": [
                 [self.x1, self.y1],
                 [self.x2, self.y2]
@@ -294,7 +294,7 @@ class ImageViewer(QWidget):
             y = random.randint(int(y1), int(y2) - 1)
             
             # 随机灰度值
-            gray_value = random.randint(min_gray, max_gray)
+            # gray_value = random.randint(min_gray, max_gray)
             
             # 添加黑点（小矩形模拟脏污）
             size = random.randint(1, 3)
@@ -303,8 +303,10 @@ class ImageViewer(QWidget):
                     nx, ny = x + dx, y + dy
                     if (0 <= nx < self.image.shape[1] and 0 <= ny < self.image.shape[0] and
                         x1 <= nx <= x2 and y1 <= ny <= y2):
-                        if random.random() < 0.7:  # 70%的概率设置像素
-                            self.image[ny, nx] = [gray_value, gray_value, gray_value]
+                        if random.random() < 0.7:  # 70% 的概率设置像素
+                            self.image[ny, nx] = [random.randint(min_gray, max_gray), 
+                                                  random.randint(min_gray, max_gray), 
+                                                  random.randint(min_gray, max_gray)]
         
         self.update_display_image()
         return True
@@ -401,8 +403,8 @@ class DirtGenerator(QMainWindow):
         density_layout = QHBoxLayout()
         density_layout.addWidget(QLabel("密度(%):"))
         self.density_spin = QDoubleSpinBox()
-        self.density_spin.setRange(0.1, 50.0)
-        self.density_spin.setValue(20.0)
+        self.density_spin.setRange(10.0, 100.0)
+        self.density_spin.setValue(50.0)
         self.density_spin.setSingleStep(0.5)
         density_layout.addWidget(self.density_spin)
         param_layout.addLayout(density_layout)
@@ -581,15 +583,20 @@ class DirtGenerator(QMainWindow):
         else:
             image_height = 480
             image_width = 640
-        
+
+        # 读取 JSON 文件
+        with open(os.path.join(self.annotation_folder, json_file), 'r') as f:
+            data = json.load(f)
+
+        # 直接使用文件中的所有数据
         annotation_data = {
-            "version": "5.6.0a0",
-            "flags": {},
-            "shapes": [],
-            "imagePath": image_file,
+            "version": data["version"],
+            "flags": data["flags"],
+            "shapes": data["shapes"],
+            "imagePath": data["imagePath"],  # 使用原始图像路径
             "imageData": None,
-            "imageHeight": image_height,
-            "imageWidth": image_width,
+            "imageHeight": data["imageHeight"],  # 使用原始图像高度
+            "imageWidth": data["imageWidth"],    # 使用原始图像宽度
             "verified": False
         }
         
