@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import os
 import socket
-from run_app import app, model_manager
+from run_inf_auxcodes import app, model_manager
 
 def get_local_ip():
     """获取本机IP地址"""
