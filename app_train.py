@@ -639,7 +639,7 @@ class TrainingInterface(QWidget):
         self.num_threads = QSpinBox()
         self.num_threads.setRange(1, 16)
         self.num_threads.setSingleStep(1)
-        self.num_threads.setValue(4)
+        self.num_threads.setValue(2)
         self.num_threads.setMaximumWidth(90)
         params_layout.addWidget(self.num_threads, 0, 9)
         
