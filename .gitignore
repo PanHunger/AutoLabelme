@@ -17,3 +17,5 @@ static
 
 *.pt
 *.onnx
+
+*.tar.gz
