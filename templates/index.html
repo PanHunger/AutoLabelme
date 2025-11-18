@@ -896,19 +896,20 @@
             $('#resultImage').attr('src', data.result_image);
             
             let infoHtml = `
-                <h6>推理信息</h6>
-                <p><strong>推理时间:</strong> ${data.inference_time}秒</p>
-                <p><strong>图像尺寸:</strong> ${data.image_size}</p>
-                <p><strong>检测数量:</strong> ${data.detection_count}</p>
+                <h6><strong>推理信息:</strong></h6>
+                <p>推理时间: ${data.inference_time}秒</p>
+                <p>图像尺寸: ${data.image_size}</p>
+                <p>检测数量: ${data.detection_count}</p>
+                <p>模型路径: ${data.model_name}</p>
             `;
             
             if (data.detections && data.detections.length > 0) {
-                infoHtml += `<h6 class="mt-3">检测结果</h6>`;
+                infoHtml += `<h6 class="mt-3"><strong>检测结果:</strong></h6>`;
                 data.detections.forEach((det, index) => {
                     infoHtml += `
                         <div class="border-bottom pb-2 mb-2">
-                            <p><strong>目标 ${index + 1}:</strong> ${det.class}</p>
-                            <p><strong>置信度:</strong> ${(det.confidence * 100).toFixed(2)}%</p>
+                            <p>目标 ${index + 1}: ${det.class}</p>
+                            <p>置信度: ${(det.confidence * 100).toFixed(2)}%</p>
                         </div>
                     `;
                 });
