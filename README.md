@@ -32,11 +32,41 @@ conda env create -f conda_environment.yml
   <img src="pics/auto-label/7.png" width="70%">
 </div>
 
-## 训练界面
+## YOLO 模型训练 Windows
 目前虽然可以有无代码的可视化训练界面，但是功能不完整，建议还是使用ultralystic的训练方法
 <div align="center">
   <img src="pics/trainapp.png" width="100%">
 </div>
+
+## WebUI 推理界面
+
+## YOLO 模型训练 WebUI
+
+基于 Ultralytics YOLO 框架的可视化目标检测模型训练平台。
+
+### 功能特点
+
+- 🎯 **可视化界面**: 无需编写代码即可完成 YOLO 模型全流程训练
+- 📊 **数据管理**: 支持多种数据集格式，自动校验和分割
+- ⚙️ **参数配置**: 灵活的模型和训练参数配置
+- 🚀 **训练监控**: 实时训练进度和指标可视化
+- 📈 **结果分析**: 详细的训练结果分析和可视化
+- 📤 **模型导出**: 支持多种格式的模型导出
+
+### 环境要求
+
+- Python 3.8+
+- CUDA 11.0+ (GPU训练推荐)
+- 至少 8GB RAM
+- 至少 10GB 可用磁盘空间
+
+### 安装步骤
+
+1. 克隆项目或下载源代码
+2. 安装依赖:
+```bash
+pip install -r requirements.txt
+```
 
 ## Acknowledgement
 

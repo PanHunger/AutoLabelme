@@ -1,0 +1,6 @@
+names: []
+nc: 0
+path: E:\Projects\PycharmProjects\2-YoloSeries\auto_labelme\temp\dataset_7251
+test: images/test
+train: images/train
+val: images/val

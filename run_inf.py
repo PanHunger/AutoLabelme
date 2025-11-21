@@ -889,11 +889,12 @@ if __name__ == '__main__':
     
     local_ip = get_local_ip()
     print(f"YOLO模型推理系统启动成功！")
-    print(f"本地访问: http://127.0.0.1:5000")
-    print(f"局域网访问: http://{local_ip}:5000")
+    print(f"本地访问: http://127.0.0.1:8001")
+    print(f"局域网访问: http://{local_ip}:8001")
     print("\n使用说明:")
-    print("1. 将YOLO模型文件夹放在 'yolo_weights' 目录下")
-    print("2. 每个模型文件夹应包含 best.pt 和 args.yaml 文件")
-    print("3. 通过网页界面选择模型并进行推理")
+    print("1. 需要搭配 AutoLabelme 使用")
+    print("2. 将 YOLO 模型文件夹放在 'yolo_weights' 目录下")
+    print("3. 每个模型文件夹应包含 best.pt 和 args.yaml 文件")
+    print("4. 通过网页界面选择模型5并进行推理")
     
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=8001, debug=True)

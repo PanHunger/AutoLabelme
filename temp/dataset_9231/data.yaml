@@ -1,0 +1,7 @@
+names:
+- cottonTop
+nc: 1
+path: E:\Projects\PycharmProjects\2-YoloSeries\auto_labelme\temp\dataset_9231
+test: images/test
+train: images/train
+val: images/val

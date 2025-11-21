@@ -1,0 +1,4 @@
+2025-11-18 23:17:42.273 | INFO     | utils.train_utils:start_training:20 - 开始训练: 数据集=temp\dataset_9231, 模型=yolov8n.pt
+2025-11-18 23:17:42.274 | INFO     | utils.train_utils:_run_training:88 - 训练线程启动
+2025-11-18 23:17:47.560 | ERROR    | utils.train_utils:_run_training:106 - 训练过程中出错: [34m[1mtrain: [0mError loading data from E:\Projects\PycharmProjects\2-YoloSeries\auto_labelme\temp\dataset_9231\images\train
+See https://docs.ultralytics.com/datasets for dataset formatting guidance.
