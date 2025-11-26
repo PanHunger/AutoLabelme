@@ -889,8 +889,8 @@ if __name__ == '__main__':
     
     local_ip = get_local_ip()
     print(f"YOLO模型推理系统启动成功！")
-    # print(f"本地访问: http://127.0.0.1:8001")
-    # print(f"局域网访问: http://{local_ip}:8001")
+    print(f"本地访问: http://127.0.0.1:8001")
+    print(f"局域网访问: http://{local_ip}:8001")
     print("\n使用说明:")
     print("1. 需要搭配 AutoLabelme 使用")
     print("2. 将 YOLO 模型文件夹放在 'yolo_weights' 目录下")
