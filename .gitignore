@@ -1,6 +1,7 @@
 /.cache/
 /.pytest_cache/
 datasets/
+runs/
 
 yolo_weights/
 static

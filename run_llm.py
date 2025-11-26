@@ -14,7 +14,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS样式 - 模仿DeepSeek风格
+# CSS样式 - 模仿 DeepSeek 风格
 st.markdown("""
 <style>
     .main-header {
