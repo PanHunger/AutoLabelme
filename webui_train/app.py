@@ -8,7 +8,7 @@ import tarfile
 from pathlib import Path
 import pandas as pd
 import matplotlib
-matplotlib.use('Agg')  # 使用非GUI后端
+matplotlib.use('Agg')  # 使用非 GUI 后端
 import matplotlib.pyplot as plt
 import seaborn as sns
 from PIL import Image
@@ -21,6 +21,7 @@ from werkzeug.utils import secure_filename
 import threading
 import time
 import json
+import socket
 
 # 导入自定义工具模块
 from utils.data_processor import DataProcessor
@@ -388,11 +389,28 @@ def download_file(file_type):
     else:
         return "文件不存在", 404
 
+def get_local_ip():
+    """获取本机IP地址"""
+    try:
+        # 连接一个外部地址但不发送数据
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except:
+        return "127.0.0.1"
+
 if __name__ == '__main__':
     # 创建必要的目录
     os.makedirs('uploads/models', exist_ok=True)
     os.makedirs('training_results', exist_ok=True)
     os.makedirs('logs', exist_ok=True)
     os.makedirs('static/images', exist_ok=True)
+    
+    local_ip = get_local_ip()
+    print(f"YOLO模型训练系统启动成功！")
+    print(f"本地访问: http://127.0.0.1:8002")
+    print(f"局域网访问: http://{local_ip}:8002")
     
     app.run(debug=True, host='0.0.0.0', port=8002)
