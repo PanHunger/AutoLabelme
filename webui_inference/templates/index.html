@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YOLO模型推理系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* 现有的样式保持不变 */
+        .model-card { transition: all 0.3s; }
+        .model-card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .image-thumbnail { cursor: pointer; transition: all 0.3s; border: 2px solid transparent; }
+        .image-thumbnail:hover { transform: scale(1.05); }
+        .image-thumbnail.selected { border-color: #007bff; }
+        .preview-area { min-height: 300px; border: 2px dashed #dee2e6; border-radius: 5px; }
+        .metrics-image { max-width: 100%; height: auto; }
+        .modal-image { max-width: 100%; cursor: move; }
+        #imageModal .modal-dialog { max-width: 90%; }
+        .loading { display: none; }
+        
+        /* 新增的样式 */
+        .args-pre {
+            max-height: 760px; /* 固定高度 */
+            overflow-y: auto;  /* 垂直滚动 */
+            overflow-x: hidden; /* 隐藏水平滚动 */
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            white-space: pre-wrap; /* 保持格式但允许换行 */
+            word-wrap: break-word;
+            margin-bottom: 0; /* 移除默认margin */
+        }
+        
+        .args-container {
+            position: relative;
+        }
+
+        /* 可选：添加悬停效果 */
+        .args-container:hover .scroll-indicator {
+            display: block;
+        }
+
+        .args-pre:hover {
+            border-color: #007bff;
+        }
+
+        /* 参数键值对的样式增强 */
+        .args-pre {
+            line-height: 1.4;
+        }
+
+        /* 为JSON键添加颜色 */
+        .args-pre {
+            color: #333;
+        }
+        
+        .args-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .args-tools {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .args-tool-btn {
+            padding: 2px 8px;
+            font-size: 0.75rem;
+            background: #e9ecef;
+            border: 1px solid #ced4da;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        
+        .args-tool-btn:hover {
+            background: #dee2e6;
+        }
+        
+        .scroll-indicator {
+            position: absolute;
+            bottom: 5px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.75rem;
+            display: none; /* 默认隐藏，通过JS控制 */
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .args-pre {
+                max-height: 300px; /* 移动设备上稍小的高度 */
+            }
+        }
+        
+        /* 自定义滚动条样式 */
+        .args-pre::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .args-pre::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        
+        .args-pre::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+        
+        .args-pre::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-robot"></i> YOLO模型推理系统
+            </a>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- 模型选择区域 -->
+        <!-- 模型选择区域 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-cube"></i> 模型选择</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="input-group mb-3">
+                            <input type="text" class="form-control" id="modelKeyword" placeholder="输入关键字筛选模型...">
+                            <button class="btn btn-outline-secondary" type="button" id="searchModels">
+                                <i class="fas fa-search"></i> 搜索
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <select class="form-select" id="modelSelect">
+                            <option value="">-- 选择模型 --</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div id="modelInfo" class="mt-3" style="display: none;">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="args-container">
+                                <div class="args-header">
+                                    <h6>模型参数</h6>
+                                    <div class="args-tools">
+                                        <button class="args-tool-btn" onclick="copyArgsToClipboard()" title="复制参数">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                        <button class="args-tool-btn" onclick="toggleArgsWrap()" title="切换换行">
+                                            <i class="fas fa-text-width"></i>
+                                        </button>
+                                        <button class="args-tool-btn" onclick="searchInArgs()" title="搜索">
+                                            <i class="fas fa-search"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <pre id="modelArgs" class="args-pre">等待加载参数...</pre>
+                                <div class="scroll-indicator" id="scrollIndicator">可滚动</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>评估指标</h6>
+                            <div id="modelMetrics" class="row"></div>
+                        </div>
+                    </div>
+                    <button class="btn btn-success mt-3" id="loadModel">
+                        <i class="fas fa-plug"></i> 加载模型
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 图像上传和选择区域 -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-upload"></i> 上传图像</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <input type="file" class="form-control" id="fileUpload" multiple accept="image/*">
+                        </div>
+                        <button class="btn btn-outline-primary mb-3" id="uploadBtn">
+                            <i class="fas fa-upload"></i> 上传选中文件
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-images"></i> 示例图像</h5>
+                    </div>
+                    <div class="card-body">
+                        <button class="btn btn-outline-info" id="loadSamples">
+                            <i class="fas fa-sync"></i> 加载示例图像
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 图像预览区域 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-eye"></i> 图像预览</h5>
+            </div>
+            <div class="card-body">
+                <div class="preview-area p-3" id="imagePreview">
+                    <p class="text-muted text-center">暂无图像</p>
+                </div>
+                <div class="mt-3">
+                    <button class="btn btn-danger" id="deleteSelected" disabled>
+                        <i class="fas fa-trash"></i> 删除选中
+                    </button>
+                    <button class="btn btn-success" id="saveSelected" disabled>
+                        <i class="fas fa-save"></i> 保存选中
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 推理参数设置 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-cog"></i> 推理参数</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <label class="form-label">置信度阈值</label>
+                        <input type="number" class="form-control" id="confThreshold" value="0.25" step="0.01" min="0" max="1">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">IoU阈值</label>
+                        <input type="number" class="form-control" id="iouThreshold" value="0.45" step="0.01" min="0" max="1">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">图像尺寸</label>
+                        <input type="number" class="form-control" id="imageSize" value="640" min="320" max="1280">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">&nbsp;</label>
+                        <button class="btn btn-primary w-100" id="inferBtn" disabled>
+                            <i class="fas fa-play"></i> 开始推理
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 推理结果 -->
+        <div class="card mb-4" id="resultSection" style="display: none;">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-bar"></i> 推理结果</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <img id="resultImage" class="img-fluid" src="" alt="推理结果">
+                    </div>
+                    <div class="col-md-6">
+                        <div id="resultInfo"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 图像预览模态框 -->
+    <div class="modal fade" id="imageModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">图像预览</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img src="" class="modal-image" id="modalImage">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 加载指示器 -->
+    <div class="loading" id="loading">
+        <div class="d-flex justify-content-center align-items-center" style="height: 200px;">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">加载中...</span>
+            </div>
+            <span class="ms-3">处理中...</span>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        // 全局变量
+        let selectedImages = [];
+        let currentModel = null;
+
+        // 初始化
+        $(document).ready(function() {
+            loadModels();
+            
+            // 模型搜索
+            $('#searchModels').click(loadModels);
+            $('#modelKeyword').keypress(function(e) {
+                if (e.which === 13) loadModels();
+            });
+            
+            // 模型选择变化
+            $('#modelSelect').change(function() {
+                const modelName = $(this).val();
+                if (modelName) {
+                    loadModelDetails(modelName);
+                } else {
+                    $('#modelInfo').hide();
+                }
+            });
+            
+            // 加载模型
+            $('#loadModel').click(loadSelectedModel);
+            
+            // 上传文件
+            $('#uploadBtn').click(uploadFiles);
+            
+            // 加载示例图像
+            $('#loadSamples').click(loadSampleImages);
+            
+            // 图像操作
+            $('#deleteSelected').click(deleteSelectedImages);
+            $('#saveSelected').click(saveSelectedImages);
+            
+            // 推理按钮
+            $('#inferBtn').click(runInference);
+        });
+
+        /* 使用JavaScript为JSON添加语法高亮（可选） */
+        function highlightJSON(element) {
+            const text = element.textContent;
+            // 简单的JSON高亮（可以根据需要扩展）
+            const highlighted = text
+                .replace(/"([^"]+)":/g, '"<span style="color: #d73a49;">$1</span>":')
+                .replace(/: ("[^"]*")/g, ': <span style="color: #032f62;">$1</span>')
+                .replace(/: (true|false|null)/g, ': <span style="color: #6f42c1;">$1</span>')
+                .replace(/: (\d+)/g, ': <span style="color: #005cc5;">$1</span>');
+            
+            element.innerHTML = highlighted;
+        }
+
+        // 加载模型列表
+        function loadModels() {
+            const keyword = $('#modelKeyword').val();
+            showLoading();
+            
+            $.get('/api/models', { keyword: keyword })
+                .done(function(data) {
+                    const select = $('#modelSelect');
+                    select.empty().append('<option value="">-- 选择模型 --</option>');
+                    
+                    data.models.forEach(model => {
+                        select.append(`<option value="${model.name}">${model.name}</option>`);
+                    });
+                })
+                .fail(function(xhr) {
+                    alert('加载模型列表失败: ' + xhr.responseJSON?.error);
+                })
+                .always(hideLoading);
+        }
+
+        // 新增函数：处理模型参数显示
+        function displayModelArgs(argsData) {
+            const argsElement = $('#modelArgs');
+            const scrollIndicator = $('#scrollIndicator');
+            
+            if (!argsData || typeof argsData !== 'object') {
+                argsElement.text('无参数信息或参数格式不正确');
+                scrollIndicator.hide();
+                return;
+            }
+            
+            if (argsData.error) {
+                argsElement.html(`<span class="text-danger">参数文件错误: ${argsData.error}</span>`);
+                scrollIndicator.hide();
+                return;
+            }
+            
+            if (argsData.info) {
+                let displayText = `<span class="text-info">${argsData.info}</span>`;
+                // 显示推断的信息（如果有）
+                if (Object.keys(argsData).length > 1) {
+                    displayText += '\n\n推断的模型信息:\n' + JSON.stringify(argsData, null, 2);
+                }
+                argsElement.text(displayText);
+            } else {
+                // 正常显示参数，使用JSON格式化
+                try {
+                    const formattedArgs = JSON.stringify(argsData, null, 2);
+                    argsElement.text(formattedArgs);
+                } catch (e) {
+                    // 如果JSON格式化失败，直接显示对象
+                    argsElement.text(String(argsData));
+                }
+            }
+            
+            // 检查内容是否需要滚动
+            setTimeout(() => {
+                if (argsElement[0].scrollHeight > argsElement[0].clientHeight) {
+                    scrollIndicator.show();
+                } else {
+                    scrollIndicator.hide();
+                }
+            }, 100);
+        }
+
+        // 复制参数到剪贴板
+        function copyArgsToClipboard() {
+            const argsText = document.getElementById('modelArgs').textContent;
+            
+            // 使用现代剪贴板API
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(argsText).then(() => {
+                    showTempMessage('参数已复制到剪贴板');
+                }).catch(err => {
+                    fallbackCopyTextToClipboard(argsText);
+                });
+            } else {
+                // 使用传统的execCommand作为备选
+                fallbackCopyTextToClipboard(argsText);
+            }
+        }
+
+        function fallbackCopyTextToClipboard(text) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            textArea.style.top = '-999999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    showTempMessage('参数已复制到剪贴板');
+                } else {
+                    showTempMessage('复制失败，请手动选择文本复制', 'error');
+                }
+            } catch (err) {
+                showTempMessage('复制失败: ' + err, 'error');
+            }
+            
+            document.body.removeChild(textArea);
+        }
+
+        // 切换文本换行
+        function toggleArgsWrap() {
+            const argsElement = document.getElementById('modelArgs');
+            if (argsElement.style.whiteSpace === 'nowrap') {
+                argsElement.style.whiteSpace = 'pre-wrap';
+                showTempMessage('已启用自动换行');
+            } else {
+                argsElement.style.whiteSpace = 'nowrap';
+                showTempMessage('已禁用自动换行');
+            }
+        }
+
+        // 在参数中搜索
+        function searchInArgs() {
+            const searchTerm = prompt('请输入要搜索的关键词:');
+            if (!searchTerm) return;
+            
+            const argsElement = document.getElementById('modelArgs');
+            const argsText = argsElement.textContent;
+            
+            // 清除之前的高亮
+            argsElement.innerHTML = argsText.replace(/<mark class="search-highlight">|<\/mark>/g, '');
+            
+            if (searchTerm) {
+                const regex = new RegExp(`(${escapeRegExp(searchTerm)})`, 'gi');
+                argsElement.innerHTML = argsText.replace(regex, '<mark class="search-highlight">$1</mark>');
+                
+                // 滚动到第一个匹配项
+                const firstMatch = argsElement.querySelector('mark');
+                if (firstMatch) {
+                    firstMatch.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    showTempMessage(`找到 ${argsElement.querySelectorAll('mark').length} 个匹配项`);
+                } else {
+                    showTempMessage('未找到匹配项', 'warning');
+                }
+            }
+        }
+
+        // 转义正则表达式特殊字符
+        function escapeRegExp(string) {
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+
+        // 显示临时消息
+        function showTempMessage(message, type = 'success') {
+            // 移除已存在的消息
+            $('.temp-message').remove();
+            
+            const bgColor = type === 'error' ? '#f8d7da' : type === 'warning' ? '#fff3cd' : '#d1edff';
+            const textColor = type === 'error' ? '#721c24' : type === 'warning' ? '#856404' : '#004085';
+            
+            const messageElement = $(`<div class="temp-message" style="
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: ${bgColor};
+                color: ${textColor};
+                padding: 10px 15px;
+                border-radius: 5px;
+                z-index: 10000;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                max-width: 300px;
+            ">${message}</div>`);
+            
+            $('body').append(messageElement);
+            
+            // 3秒后自动消失
+            setTimeout(() => {
+                messageElement.fadeOut(300, function() {
+                    $(this).remove();
+                });
+            }, 3000);
+        }
+
+        // 添加搜索高亮的CSS样式
+        const searchHighlightStyle = document.createElement('style');
+        searchHighlightStyle.textContent = `
+            .search-highlight {
+                background-color: #ffeb3b;
+                padding: 1px 3px;
+                border-radius: 2px;
+                font-weight: bold;
+            }
+        `;
+        document.head.appendChild(searchHighlightStyle);
+
+        // 修改加载模型详情的函数
+        function loadModelDetails(modelName) {
+            showLoading();
+            
+            $.get(`/api/model/${modelName}`)
+                .done(function(data) {
+                    currentModel = modelName;
+                    
+                    // 使用新的参数显示函数
+                    displayModelArgs(data.args);
+                    
+                    // 显示评估指标图像
+                    displayModelMetrics(data.metrics_images, modelName);
+                    
+                    $('#modelInfo').show();
+                })
+                .fail(function(xhr) {
+                    alert('加载模型详情失败: ' + xhr.responseJSON?.error);
+                })
+                .always(hideLoading);
+        }
+
+        // 新增函数：显示评估指标图像
+        function displayModelMetrics(metricsImages, modelName) {
+            const metricsContainer = $('#modelMetrics');
+            
+            if (!metricsImages || Object.keys(metricsImages).length === 0) {
+                metricsContainer.html('<p class="text-muted">未找到评估指标图像</p>');
+                return;
+            }
+            
+            let html = '';
+            const metricTitles = {
+                'confusion_matrix': '混淆矩阵',
+                'precision_recall': '精确率-召回率曲线',
+                // 'f1_curve': 'F1分数曲线',
+                'results': '训练结果',
+                'labels': '标签分布',
+                'val_batch_pred': '验证集预测结果',
+                'val_batch_labels': '验证集真实标签'
+            };
+            
+            Object.keys(metricsImages).forEach(metricType => {
+                const imageUrl = `/api/model_image/${modelName}/${metricType}`;
+                const title = metricTitles[metricType] || metricType;
+                
+                html += `
+                    <div class="col-md-6 mb-3">
+                        <div class="card">
+                            <div class="card-header py-2">
+                                <h6 class="mb-0">${title}</h6>
+                            </div>
+                            <div class="card-body p-2 text-center">
+                                <img src="${imageUrl}" 
+                                    class="metrics-image img-fluid" 
+                                    style="max-height: 200px; cursor: pointer;"
+                                    onclick="openMetricImage('${imageUrl}', '${title}')"
+                                    onerror="this.style.display='none'"
+                                    alt="${title}">
+                                <small class="text-muted"></small>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            metricsContainer.html(`<div class="row">${html}</div>`);
+        }
+
+        // 新增函数：打开评估指标大图
+        function openMetricImage(imageUrl, title) {
+            const modalHtml = `
+                <div class="modal fade" id="metricModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">${title}</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body text-center">
+                                <img src="${imageUrl}" class="img-fluid">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // 移除已存在的模态框
+            $('#metricModal').remove();
+            
+            // 添加新的模态框并显示
+            $('body').append(modalHtml);
+            $('#metricModal').modal('show');
+        }
+
+        // 修复加载模型的请求
+        function loadSelectedModel() {
+            if (!currentModel) {
+                alert('请先选择模型');
+                return;
+            }
+            
+            showLoading();
+            
+            // 使用正确的AJAX格式
+            $.ajax({
+                url: `/api/model/${currentModel}/load`,
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({}), // 空数据但确保格式正确
+                success: function(data) {
+                    alert(data.message);
+                    $('#inferBtn').prop('disabled', false);
+                },
+                error: function(xhr) {
+                    alert('加载模型失败: ' + (xhr.responseJSON?.error || xhr.statusText));
+                },
+                complete: hideLoading
+            });
+        }
+
+        // 上传文件
+        function uploadFiles() {
+            const files = $('#fileUpload')[0].files;
+            if (files.length === 0) {
+                alert('请选择文件');
+                return;
+            }
+            
+            const formData = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                formData.append('files[]', files[i]);
+            }
+            
+            showLoading();
+            
+            $.ajax({
+                url: '/api/upload',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    displayImages(data.files);
+                },
+                error: function(xhr) {
+                    alert('上传失败: ' + xhr.responseJSON?.error);
+                },
+                complete: hideLoading
+            });
+        }
+
+        // 修改示例图像加载函数，添加错误处理
+        function loadSampleImages() {
+            if (!currentModel) {
+                alert('请先选择模型');
+                return;
+            }
+            
+            showLoading();
+            
+            $.get(`/api/sample_images/${currentModel}`)
+                .done(function(data) {
+                    if (data.images && data.images.length > 0) {
+                        displayImages(data.images);
+                    } else {
+                        $('#imagePreview').html('<p class="text-warning text-center">未找到示例图像</p>');
+                        alert('该模型没有找到示例图像。请检查模型文件夹中是否有图像文件。');
+                    }
+                })
+                .fail(function(xhr) {
+                    alert('加载示例图像失败: ' + xhr.responseJSON?.error);
+                    $('#imagePreview').html('<p class="text-danger text-center">加载示例图像失败</p>');
+                })
+                .always(hideLoading);
+        }
+
+        // 显示图像
+        function displayImages(images) {
+            const preview = $('#imagePreview');
+            
+            if (images.length === 0) {
+                preview.html('<p class="text-muted text-center">暂无图像</p>');
+                return;
+            }
+            
+            let html = '<div class="row">';
+            images.forEach(img => {
+                html += `
+                    <div class="col-md-2 mb-3">
+                        <div class="image-thumbnail" data-filename="${img.filename}" data-url="${img.url}">
+                            <img src="${img.url}" class="img-fluid" style="height: 100px; object-fit: cover;">
+                            <small class="d-block">${img.filename}</small>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            preview.html(html);
+            
+            // 添加点击事件
+            $('.image-thumbnail').click(function() {
+                const filename = $(this).data('filename');
+                const url = $(this).data('url');
+                
+                if ($(this).hasClass('selected')) {
+                    $(this).removeClass('selected');
+                    selectedImages = selectedImages.filter(img => img.filename !== filename);
+                } else {
+                    $(this).addClass('selected');
+                    selectedImages.push({ filename, url });
+                }
+                
+                updateImageButtons();
+            });
+            
+            // 添加双击事件查看大图
+            $('.image-thumbnail img').dblclick(function() {
+                const imgUrl = $(this).attr('src');
+                $('#modalImage').attr('src', imgUrl);
+                $('#imageModal').modal('show');
+            });
+        }
+
+        // 更新图像操作按钮状态
+        function updateImageButtons() {
+            const hasSelection = selectedImages.length > 0;
+            $('#deleteSelected').prop('disabled', !hasSelection);
+            $('#saveSelected').prop('disabled', !hasSelection);
+            $('#inferBtn').prop('disabled', selectedImages.length === 0);
+        }
+
+        // 删除选中图像
+        function deleteSelectedImages() {
+            selectedImages.forEach(img => {
+                $(`.image-thumbnail[data-filename="${img.filename}"]`).remove();
+            });
+            selectedImages = [];
+            updateImageButtons();
+        }
+
+        // 修复保存图像的请求
+        function saveSelectedImages() {
+            showLoading();
+            
+            if (selectedImages.length > 0) {
+                const img = selectedImages[0];
+                $.ajax({
+                    url: '/api/save_image',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        image_url: img.url,
+                        filename: img.filename
+                    }),
+                    success: function(data) {
+                        alert('图像保存成功');
+                        // 创建下载链接
+                        const link = document.createElement('a');
+                        link.href = data.download_url;
+                        link.download = img.filename;
+                        link.click();
+                    },
+                    error: function(xhr) {
+                        alert('保存失败: ' + (xhr.responseJSON?.error || xhr.statusText));
+                    },
+                    complete: hideLoading
+                });
+            } else {
+                hideLoading();
+            }
+        }
+
+        // 在推理函数中添加调试信息
+        function runInference() {
+            if (selectedImages.length === 0) {
+                alert('请选择图像');
+                return;
+            }
+            
+            const imageUrl = selectedImages[0].url;
+            let imagePath = imageUrl;
+            if (imageUrl.startsWith('/static/')) {
+                imagePath = imageUrl.substring(1);
+            }
+            
+            console.log('推理请求数据:', {
+                image_path: imagePath,
+                image_url: imageUrl,
+                parameters: {
+                    conf: parseFloat($('#confThreshold').val()),
+                    iou: parseFloat($('#iouThreshold').val()),
+                    imgsz: parseInt($('#imageSize').val())
+                }
+            });
+            
+            // 其余代码保持不变...
+            showLoading();
+            
+            $.ajax({
+                url: '/api/infer',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    image_path: imagePath,
+                    parameters: {
+                        conf: parseFloat($('#confThreshold').val()),
+                        iou: parseFloat($('#iouThreshold').val()),
+                        imgsz: parseInt($('#imageSize').val())
+                    }
+                }),
+                success: function(data) {
+                    console.log('推理响应:', data);
+                    displayResults(data);
+                },
+                error: function(xhr) {
+                    console.error('推理错误详情:', xhr);
+                    let errorMsg = '推理失败';
+                    if (xhr.responseJSON && xhr.responseJSON.error) {
+                        errorMsg += ': ' + xhr.responseJSON.error;
+                    } else {
+                        errorMsg += ' (状态: ' + xhr.status + ')';
+                    }
+                    alert(errorMsg);
+                },
+                complete: hideLoading
+            });
+        }
+
+        // 显示推理结果
+        function displayResults(data) {
+            $('#resultImage').attr('src', data.result_image);
+            
+            let infoHtml = `
+                <h6><strong>推理信息:</strong></h6>
+                <p>推理时间: ${data.inference_time}秒</p>
+                <p>图像尺寸: ${data.image_size}</p>
+                <p>检测数量: ${data.detection_count}</p>
+                <p>模型路径: ${data.model_name}</p>
+            `;
+            
+            if (data.detections && data.detections.length > 0) {
+                infoHtml += `<h6 class="mt-3"><strong>检测结果:</strong></h6>`;
+                data.detections.forEach((det, index) => {
+                    infoHtml += `
+                        <div class="border-bottom pb-2 mb-2">
+                            <p>目标 ${index + 1}: ${det.class}</p>
+                            <p>置信度: ${(det.confidence * 100).toFixed(2)}%</p>
+                        </div>
+                    `;
+                });
+            }
+            
+            $('#resultInfo').html(infoHtml);
+            $('#resultSection').show();
+        }
+
+        // 显示/隐藏加载指示器
+        function showLoading() {
+            $('#loading').show();
+        }
+
+        function hideLoading() {
+            $('#loading').hide();
+        }
+
+        // 图像模态框的缩放和拖拽功能
+        let scale = 1;
+        let isDragging = false;
+        let startX, startY, translateX = 0, translateY = 0;
+
+        $('#imageModal').on('shown.bs.modal', function() {
+            const modalImage = $('#modalImage')[0];
+            scale = 1;
+            translateX = 0;
+            translateY = 0;
+            updateImageTransform();
+            
+            // 鼠标滚轮缩放
+            $(this).on('wheel', function(e) {
+                e.preventDefault();
+                const delta = e.originalEvent.deltaY > 0 ? -0.1 : 0.1;
+                scale = Math.max(0.1, Math.min(5, scale + delta));
+                updateImageTransform();
+            });
+            
+            // 鼠标拖拽
+            modalImage.addEventListener('mousedown', startDrag);
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', stopDrag);
+        });
+
+        function startDrag(e) {
+            isDragging = true;
+            startX = e.clientX - translateX;
+            startY = e.clientY - translateY;
+        }
+
+        function drag(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+            translateX = e.clientX - startX;
+            translateY = e.clientY - startY;
+            updateImageTransform();
+        }
+
+        function stopDrag() {
+            isDragging = false;
+        }
+
+        function updateImageTransform() {
+            $('#modalImage').css('transform', `translate(${translateX}px, ${translateY}px) scale(${scale})`);
+        }
+    </script>
+</body>
+</html>
