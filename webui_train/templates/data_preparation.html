@@ -1,0 +1,343 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="fas fa-database"></i> 数据准备</h2>
+        <p class="text-muted">上传和管理您的训练数据集</p>
+        <hr>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <ul class="nav nav-tabs" id="dataTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="upload-tab" data-bs-toggle="tab" data-bs-target="#upload" type="button" role="tab">
+                    <i class="fas fa-upload"></i> 上传数据
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="validate-tab" data-bs-toggle="tab" data-bs-target="#validate" type="button" role="tab">
+                    <i class="fas fa-check-circle"></i> 数据校验
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="classes-tab" data-bs-toggle="tab" data-bs-target="#classes" type="button" role="tab">
+                    <i class="fas fa-tags"></i> 类别管理
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content mt-4" id="dataTabsContent">
+            <!-- 上传数据标签页 -->
+            <div class="tab-pane fade show active" id="upload" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-file-upload"></i> 方式1: 上传原始文件（自动分割）
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="rawUploadForm" action="{{ url_for('data_preparation') }}" method="post" enctype="multipart/form-data">
+                                    <div class="mb-3">
+                                        <label class="form-label">上传图片文件</label>
+                                        <input type="file" class="form-control" name="images" multiple accept=".jpg,.jpeg,.png" required>
+                                        <div class="form-text">选择训练图片文件 (jpg/png/jpeg格式)</div>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">上传标注文件</label>
+                                        <input type="file" class="form-control" name="labels" multiple accept=".txt" required>
+                                        <div class="form-text">选择YOLO格式的标注文件 (.txt)</div>
+                                    </div>
+                                    
+                                    <div class="row mb-3">
+                                        <div class="col-md-4">
+                                            <label class="form-label">训练集比例</label>
+                                            <input type="number" class="form-control" name="train_ratio" value="0.8" step="0.05" min="0.5" max="0.9" required>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">验证集比例</label>
+                                            <input type="number" class="form-control" name="val_ratio" value="0.1" step="0.05" min="0.1" max="0.4" required>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">测试集比例</label>
+                                            <input type="number" class="form-control" name="test_ratio" value="0.1" step="0.05" min="0.0" max="0.3" required>
+                                        </div>
+                                    </div>
+                                    
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-rocket"></i> 处理数据集
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-file-archive"></i> 方式2: 上传已划分的数据集压缩包
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="zipUploadForm" action="{{ url_for('data_preparation') }}" method="post" enctype="multipart/form-data">
+                                    <div class="mb-3">
+                                        <label class="form-label">上传数据集压缩包</label>
+                                        <input type="file" class="form-control" name="dataset_zip" accept=".zip,.tar,.gz" required>
+                                        <div class="form-text">支持 zip, tar, gz 格式</div>
+                                    </div>
+                                    
+                                    <div class="alert alert-info">
+                                        <h6><i class="fas fa-info-circle"></i> 数据集目录结构要求:</h6>
+                                        <pre class="mb-0 small">
+dataset_name/
+├── images/
+│   ├── train/
+│   ├── val/
+│   └── test/
+├── labels/
+│   ├── train/
+│   ├── val/
+│   └── test/
+└── data.yaml</pre>
+                                    </div>
+                                    
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-check-circle"></i> 解压并验证数据集
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 数据校验标签页 -->
+            <div class="tab-pane fade" id="validate" role="tabpanel">
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-check-circle"></i> 数据校验
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="validationResult">
+                                    {% if session.get('dataset_path') %}
+                                        <p>已加载数据集: <code>{{ session.dataset_path }}</code></p>
+                                        <button type="button" class="btn btn-primary" onclick="validateDataset()">
+                                            <i class="fas fa-play"></i> 运行数据校验
+                                        </button>
+                                    {% else %}
+                                        <div class="alert alert-warning">
+                                            <i class="fas fa-exclamation-triangle"></i> 请先上传数据集
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div id="validationDetails" class="mt-4" style="display: none;">
+                                    <!-- 校验结果将动态加载到这里 -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 类别管理标签页 -->
+            <div class="tab-pane fade" id="classes" role="tabpanel">
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-tags"></i> 类别管理
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                {% if session.get('dataset_path') %}
+                                    <div id="classInfo">
+                                        <!-- 类别信息将动态加载 -->
+                                        <p>正在加载类别信息...</p>
+                                    </div>
+                                    
+                                    <div class="mt-4">
+                                        <h6>编辑类别信息</h6>
+                                        <form id="classUpdateForm">
+                                            <div class="mb-3">
+                                                <label class="form-label">类别名称</label>
+                                                <textarea class="form-control" id="classNames" rows="5" placeholder="每行一个类别名称"></textarea>
+                                                <div class="form-text">每行输入一个类别名称</div>
+                                            </div>
+                                            <button type="button" class="btn btn-primary" onclick="updateClasses()">
+                                                <i class="fas fa-save"></i> 更新类别信息
+                                            </button>
+                                        </form>
+                                    </div>
+                                {% else %}
+                                    <div class="alert alert-warning">
+                                        <i class="fas fa-exclamation-triangle"></i> 请先上传数据集
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 处理表单提交
+document.addEventListener('DOMContentLoaded', function() {
+    // 原始文件上传表单
+    const rawForm = document.getElementById('rawUploadForm');
+    if (rawForm) {
+        rawForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            handleFileUpload('rawUploadForm', function(result) {
+                if (result.success) {
+                    // 刷新页面以更新状态
+                    setTimeout(() => location.reload(), 1000);
+                }
+            });
+        });
+    }
+    
+    // 压缩包上传表单
+    const zipForm = document.getElementById('zipUploadForm');
+    if (zipForm) {
+        zipForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            handleFileUpload('zipUploadForm', function(result) {
+                if (result.success) {
+                    setTimeout(() => location.reload(), 1000);
+                }
+            });
+        });
+    }
+    
+    // 加载类别信息
+    if (document.getElementById('classInfo')) {
+        loadClassInfo();
+    }
+});
+
+// 验证数据集
+function validateDataset() {
+    const resultDiv = document.getElementById('validationResult');
+    resultDiv.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> 正在校验数据集...</div>';
+    
+    fetch('{{ url_for("validate_dataset") }}')
+        .then(response => response.json())
+        .then(data => {
+            let html = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>📊 数据集统计</h6>
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>分割</th>
+                                    <th>图片数量</th>
+                                    <th>标注数量</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>训练集</td>
+                                    <td>${data.train_images || 0}</td>
+                                    <td>${data.train_labels || 0}</td>
+                                </tr>
+                                <tr>
+                                    <td>验证集</td>
+                                    <td>${data.val_images || 0}</td>
+                                    <td>${data.val_labels || 0}</td>
+                                </tr>
+                                <tr>
+                                    <td>测试集</td>
+                                    <td>${data.test_images || 0}</td>
+                                    <td>${data.test_labels || 0}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>✅ 校验结果</h6>
+            `;
+            
+            if (data.is_valid) {
+                html += '<div class="alert alert-success">✅ 数据集格式正确</div>';
+            } else {
+                html += '<div class="alert alert-danger">❌ 数据集存在问题</div>';
+            }
+            
+            if (data.issues && data.issues.length > 0) {
+                html += '<ul class="list-unstyled">';
+                data.issues.forEach(issue => {
+                    html += `<li><span class="text-warning">⚠️</span> ${issue}</li>`;
+                });
+                html += '</ul>';
+            }
+            
+            html += '</div></div>';
+            
+            document.getElementById('validationDetails').innerHTML = html;
+            document.getElementById('validationDetails').style.display = 'block';
+            resultDiv.innerHTML = '<p>已加载数据集: <code>{{ session.dataset_path }}</code></p>' +
+                '<button type="button" class="btn btn-primary" onclick="validateDataset()">' +
+                '<i class="fas fa-play"></i> 重新运行数据校验</button>';
+        })
+        .catch(error => {
+            resultDiv.innerHTML = '<div class="alert alert-danger">校验失败: ' + error + '</div>';
+        });
+}
+
+// 加载类别信息
+function loadClassInfo() {
+    // 这里应该从服务器获取实际的类别信息
+    // 暂时使用模拟数据
+    const classInfoDiv = document.getElementById('classInfo');
+    classInfoDiv.innerHTML = `
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> 从 data.yaml 读取的类别信息:
+        </div>
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>类别名称</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>0</td><td>class0</td></tr>
+                <tr><td>1</td><td>class1</td></tr>
+                <tr><td>2</td><td>class2</td></tr>
+            </tbody>
+        </table>
+    `;
+    
+    document.getElementById('classNames').value = "class0\nclass1\nclass2";
+}
+
+// 更新类别信息
+function updateClasses() {
+    const classNames = document.getElementById('classNames').value;
+    if (!classNames.trim()) {
+        showMessage('请输入类别名称', 'warning');
+        return;
+    }
+    
+    showMessage('类别更新功能正在开发中...', 'info');
+}
+</script>
+{% endblock %}

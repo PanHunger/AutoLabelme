@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="fas fa-cog"></i> 模型配置</h2>
+        <p class="text-muted">选择模型架构和配置训练参数</p>
+        <hr>
+    </div>
+</div>
+
+{% if not session.get('dataset_path') %}
+<div class="row">
+    <div class="col-12">
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle"></i> 请先完成数据准备
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-project-diagram"></i> 模型选择
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="modelConfigForm" action="{{ url_for('model_configuration') }}" method="post" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label class="form-label">选择预训练模型</label>
+                        <select class="form-select" name="model" id="modelSelect" required>
+                            {% for name, path in pretrained_models.items() %}
+                            <option value="{{ path }}">{{ name }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">选择适合您任务的模型尺寸</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="useCustomModel" name="use_custom_model">
+                            <label class="form-check-label" for="useCustomModel">
+                                使用自定义预训练权重
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3" id="customModelSection" style="display: none;">
+                        <label class="form-label">上传自定义权重文件</label>
+                        <input type="file" class="form-control" name="custom_model" accept=".pt">
+                        <div class="form-text">上传您自己的预训练权重文件 (.pt格式)</div>
+                    </div>
+
+                    <hr>
+
+                    <h6 class="mb-3">训练参数</h6>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">训练轮次 (epochs)</label>
+                            <input type="number" class="form-control" name="epochs" value="100" min="1" max="1000" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">输入图像尺寸</label>
+                            <select class="form-select" name="img_size" required>
+                                <option value="224">224</option>
+                                <option value="320">320</option>
+                                <option value="416">416</option>
+                                <option value="512">512</option>
+                                <option value="640" selected>640</option>
+                                <option value="768">768</option>
+                                <option value="1024">1024</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">批次大小 (batch size)</label>
+                            <input type="number" class="form-control" name="batch_size" value="16" min="1" max="256" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">学习率 (lr0)</label>
+                            <input type="number" class="form-control" name="learning_rate" value="0.01" step="0.0001" min="0.00001" max="1.0" required>
+                        </div>
+                    </div>
+
+                    <h6 class="mb-3">优化器配置</h6>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">优化器</label>
+                            <select class="form-select" name="optimizer" required>
+                                <option value="SGD">SGD</option>
+                                <option value="Adam">Adam</option>
+                                <option value="AdamW" selected>AdamW</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">权重衰减</label>
+                            <input type="number" class="form-control" name="weight_decay" value="0.0005" step="0.00001" min="0.0" max="0.1" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">动量</label>
+                            <input type="number" class="form-control" name="momentum" value="0.937" step="0.001" min="0.0" max="0.99" required>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">训练设备</label>
+                            <select class="form-select" name="device" required>
+                                {% for device in device_options %}
+                                <option value="{{ device }}" {% if device.startswith('GPU') %}selected{% endif %}>{{ device }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">数据加载进程数</label>
+                            <input type="number" class="form-control" name="workers" value="4" min="0" max="16" required>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="save_best" value="true" id="saveBest" checked>
+                                <label class="form-check-label" for="saveBest">
+                                    仅保存最佳模型
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">早停耐心值</label>
+                            <input type="number" class="form-control" name="patience" value="50" min="0" max="100" required>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-save"></i> 保存配置
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle"></i> 配置信息
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-4">
+                    <h6>当前配置状态</h6>
+                    {% if session.get('training_config') %}
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i> 训练参数配置完成
+                    </div>
+                    <table class="table table-sm">
+                        <tbody>
+                            <tr><td><strong>模型</strong></td><td>{{ session.training_config.model }}</td></tr>
+                            <tr><td><strong>训练轮次</strong></td><td>{{ session.training_config.epochs }}</td></tr>
+                            <tr><td><strong>图像尺寸</strong></td><td>{{ session.training_config.img_size }}</td></tr>
+                            <tr><td><strong>批次大小</strong></td><td>{{ session.training_config.batch_size }}</td></tr>
+                            <tr><td><strong>学习率</strong></td><td>{{ session.training_config.learning_rate }}</td></tr>
+                            <tr><td><strong>设备</strong></td><td>{{ session.training_config.device }}</td></tr>
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i> 尚未配置训练参数
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="mb-4">
+                    <h6>模型选择指南</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>模型</th>
+                                    <th>参数量</th>
+                                    <th>速度</th>
+                                    <th>精度</th>
+                                    <th>适用场景</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>YOLOv8n</td>
+                                    <td>3.2M</td>
+                                    <td>⚡⚡⚡⚡⚡</td>
+                                    <td>⭐⭐⭐</td>
+                                    <td>移动端、实时检测</td>
+                                </tr>
+                                <tr>
+                                    <td>YOLOv8s</td>
+                                    <td>11.2M</td>
+                                    <td>⚡⚡⚡⚡</td>
+                                    <td>⭐⭐⭐⭐</td>
+                                    <td>平衡速度与精度</td>
+                                </tr>
+                                <tr>
+                                    <td>YOLOv8m</td>
+                                    <td>25.9M</td>
+                                    <td>⚡⚡⚡</td>
+                                    <td>⭐⭐⭐⭐⭐</td>
+                                    <td>一般应用</td>
+                                </tr>
+                                <tr>
+                                    <td>YOLOv8l</td>
+                                    <td>43.7M</td>
+                                    <td>⚡⚡</td>
+                                    <td>⭐⭐⭐⭐⭐</td>
+                                    <td>高精度需求</td>
+                                </tr>
+                                <tr>
+                                    <td>YOLOv8x</td>
+                                    <td>68.2M</td>
+                                    <td>⚡</td>
+                                    <td>⭐⭐⭐⭐⭐⭐</td>
+                                    <td>研究、竞赛</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="alert alert-info">
+                    <h6><i class="fas fa-lightbulb"></i> 使用建议</h6>
+                    <ul class="mb-0 small">
+                        <li>根据您的硬件选择合适尺寸的模型</li>
+                        <li>GPU训练建议使用较大批次大小</li>
+                        <li>复杂场景建议使用更大图像尺寸</li>
+                        <li>学习率可根据数据集大小调整</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 处理自定义模型上传显示
+    const customModelCheckbox = document.getElementById('useCustomModel');
+    const customModelSection = document.getElementById('customModelSection');
+    const modelSelect = document.getElementById('modelSelect');
+    
+    customModelCheckbox.addEventListener('change', function() {
+        if (this.checked) {
+            customModelSection.style.display = 'block';
+            modelSelect.disabled = true;
+        } else {
+            customModelSection.style.display = 'none';
+            modelSelect.disabled = false;
+        }
+    });
+    
+    // 处理表单提交
+    const form = document.getElementById('modelConfigForm');
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        
+        // 显示加载状态
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 保存中...';
+        submitBtn.disabled = true;
+        
+        const formData = new FormData(this);
+        
+        fetch(this.action, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showMessage(data.message, 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showMessage(data.message, 'danger');
+            }
+        })
+        .catch(error => {
+            showMessage('保存失败: ' + error, 'danger');
+        })
+        .finally(() => {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        });
+    });
+});
+</script>
+{% endblock %}

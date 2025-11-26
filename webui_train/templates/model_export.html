@@ -1,0 +1,334 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="fas fa-download"></i> 模型导出</h2>
+        <p class="text-muted">将训练好的模型导出为不同格式</p>
+        <hr>
+    </div>
+</div>
+
+{% if not session.get('training_results') %}
+<div class="row">
+    <div class="col-12">
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle"></i> 请先完成训练
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-cog"></i> 导出设置
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="exportForm" action="{{ url_for('model_export') }}" method="post">
+                    <div class="mb-3">
+                        <label class="form-label">选择导出格式</label>
+                        <select class="form-select" name="export_format" id="exportFormat" required>
+                            <option value="torchscript">PyTorch (.pt)</option>
+                            <option value="onnx">ONNX (.onnx)</option>
+                            <option value="engine">TensorRT</option>
+                            <option value="coreml">CoreML (.mlmodel)</option>
+                            <option value="saved_model">TensorFlow SavedModel</option>
+                            <option value="openvino">OpenVINO</option>
+                        </select>
+                        <div class="form-text">选择目标部署平台的模型格式</div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">输入图像尺寸</label>
+                            <select class="form-select" name="img_size" required>
+                                <option value="224">224</option>
+                                <option value="320">320</option>
+                                <option value="416">416</option>
+                                <option value="512">512</option>
+                                <option value="640" selected>640</option>
+                                <option value="768">768</option>
+                                <option value="1024">1024</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">批次大小</label>
+                            <input type="number" class="form-control" name="batch_size" value="1" min="1" max="64">
+                            <div class="form-text">推理时的批次大小</div>
+                        </div>
+                    </div>
+
+                    <!-- ONNX 特定配置 -->
+                    <div id="onnxConfig" class="export-config" style="display: none;">
+                        <h6 class="mb-3">ONNX 配置</h6>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">ONNX opset版本</label>
+                                <input type="number" class="form-control" name="opset_version" value="12" min="10" max="15">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">动态维度</label>
+                                <select class="form-select" name="dynamic_axes">
+                                    <option value="false">固定尺寸</option>
+                                    <option value="true">动态尺寸</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TensorRT 特定配置 -->
+                    <div id="tensorrtConfig" class="export-config" style="display: none;">
+                        <h6 class="mb-3">TensorRT 配置</h6>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">精度模式</label>
+                                <select class="form-select" name="precision">
+                                    <option value="FP32">FP32</option>
+                                    <option value="FP16">FP16</option>
+                                    <option value="INT8">INT8</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">工作空间大小 (MB)</label>
+                                <input type="number" class="form-control" name="workspace_size" value="1024" min="256" max="8192">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CoreML 特定配置 -->
+                    <div id="coremlConfig" class="export-config" style="display: none;">
+                        <h6 class="mb-3">CoreML 配置</h6>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="nms" id="coremlNMS" checked>
+                                <label class="form-check-label" for="coremlNMS">
+                                    包含NMS后处理
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg w-100" id="exportBtn">
+                            <i class="fas fa-rocket"></i> 开始导出
+                        </button>
+                    </div>
+                </form>
+
+                <div id="exportResult" class="mt-4" style="display: none;">
+                    <!-- 导出结果将动态显示在这里 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle"></i> 导出信息
+                </h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tbody>
+                        <tr>
+                            <td><strong>原始模型</strong></td>
+                            <td>{{ session.training_config.model }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>训练轮次</strong></td>
+                            <td>{{ session.training_config.epochs }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>输入尺寸</strong></td>
+                            <td>{{ session.training_config.img_size }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>mAP@0.5</strong></td>
+                            <td>0.85</td>
+                        </tr>
+                        <tr>
+                            <td><strong>模型大小</strong></td>
+                            <td>-- MB</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-table"></i> 格式对比
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>格式</th>
+                                <th>平台</th>
+                                <th>性能</th>
+                                <th>大小</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>PyTorch</td>
+                                <td>Python</td>
+                                <td>⭐⭐⭐⭐⭐</td>
+                                <td>中</td>
+                            </tr>
+                            <tr>
+                                <td>ONNX</td>
+                                <td>多平台</td>
+                                <td>⭐⭐⭐⭐</td>
+                                <td>小</td>
+                            </tr>
+                            <tr>
+                                <td>TensorRT</td>
+                                <td>NVIDIA</td>
+                                <td>⭐⭐⭐⭐⭐</td>
+                                <td>小</td>
+                            </tr>
+                            <tr>
+                                <td>CoreML</td>
+                                <td>Apple</td>
+                                <td>⭐⭐⭐⭐</td>
+                                <td>中</td>
+                            </tr>
+                            <tr>
+                                <td>TensorFlow</td>
+                                <td>多平台</td>
+                                <td>⭐⭐⭐</td>
+                                <td>大</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-lightbulb"></i> 导出建议
+                </h5>
+            </div>
+            <div class="card-body">
+                <ul class="small mb-0">
+                    <li><strong>PyTorch</strong>: 用于Python环境部署</li>
+                    <li><strong>ONNX</strong>: 跨平台部署首选</li>
+                    <li><strong>TensorRT</strong>: NVIDIA GPU最佳性能</li>
+                    <li><strong>CoreML</strong>: iOS/macOS应用</li>
+                    <li><strong>TensorFlow</strong>: TensorFlow生态</li>
+                    <li><strong>OpenVINO</strong>: Intel硬件优化</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const exportFormat = document.getElementById('exportFormat');
+    const configSections = document.querySelectorAll('.export-config');
+    
+    // 显示/隐藏格式特定配置
+    function updateExportConfig() {
+        const selectedFormat = exportFormat.value;
+        
+        // 隐藏所有配置部分
+        configSections.forEach(section => {
+            section.style.display = 'none';
+        });
+        
+        // 显示选中的配置部分
+        const selectedConfig = document.getElementById(selectedFormat + 'Config');
+        if (selectedConfig) {
+            selectedConfig.style.display = 'block';
+        }
+    }
+    
+    exportFormat.addEventListener('change', updateExportConfig);
+    updateExportConfig(); // 初始化
+    
+    // 处理导出表单提交
+    const form = document.getElementById('exportForm');
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const exportBtn = document.getElementById('exportBtn');
+        const originalText = exportBtn.innerHTML;
+        
+        // 显示加载状态
+        exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 导出中...';
+        exportBtn.disabled = true;
+        
+        const formData = new FormData(this);
+        
+        fetch(this.action, {
+            method: 'POST',
+            body: new URLSearchParams(formData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            const resultDiv = document.getElementById('exportResult');
+            
+            if (data.success) {
+                resultDiv.innerHTML = `
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i> ${data.message}
+                        ${data.download_url ? `
+                        <div class="mt-2">
+                            <a href="${data.download_url}" class="btn btn-success">
+                                <i class="fas fa-download"></i> 下载导出模型
+                            </a>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+            } else {
+                resultDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle"></i> ${data.message}
+                    </div>
+                `;
+            }
+            
+            resultDiv.style.display = 'block';
+        })
+        .catch(error => {
+            document.getElementById('exportResult').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle"></i> 导出失败: ${error}
+                </div>
+            `;
+            document.getElementById('exportResult').style.display = 'block';
+        })
+        .finally(() => {
+            exportBtn.innerHTML = originalText;
+            exportBtn.disabled = false;
+        });
+    });
+});
+</script>
+
+<style>
+.export-config {
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    padding: 15px;
+    margin-bottom: 15px;
+    border-left: 4px solid #007bff;
+}
+</style>
+{% endblock %}

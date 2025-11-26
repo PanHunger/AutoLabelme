@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="jumbotron bg-light p-5 rounded">
+            <h1 class="display-4"><i class="fas fa-search"></i> YOLO 模型训练平台</h1>
+            <p class="lead">基于 Ultralytics YOLO 框架的可视化目标检测模型训练解决方案</p>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-8">
+        <h3>主要功能</h3>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-database"></i> 数据准备</h5>
+                        <p class="card-text">支持多种数据集格式上传和自动校验</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-cog"></i> 模型配置</h5>
+                        <p class="card-text">灵活的模型参数配置界面</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-play"></i> 训练执行</h5>
+                        <p class="card-text">实时监控训练过程和可视化指标</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-chart-line"></i> 结果查看</h5>
+                        <p class="card-text">详细的训练结果分析和可视化</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <h3>系统状态</h3>
+        <div class="card">
+            <div class="card-body">
+                <h6 class="card-title"><i class="fas fa-microchip"></i> GPU 状态</h6>
+                {% if system_status.gpu_available %}
+                    <span class="badge bg-success">可用 ({{ system_status.gpu_count }} 个设备)</span>
+                    <ul class="mt-2">
+                        {% for gpu_name in system_status.gpu_names %}
+                            <li><small>{{ gpu_name }}</small></li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <span class="badge bg-warning">不可用</span>
+                {% endif %}
+                
+                <h6 class="card-title mt-3"><i class="fas fa-box"></i> 依赖检查</h6>
+                <ul class="list-unstyled">
+                    <li>
+                        {% if system_status.ultralytics_available %}
+                            <i class="fas fa-check text-success"></i>
+                        {% else %}
+                            <i class="fas fa-times text-danger"></i>
+                        {% endif %}
+                        Ultralytics YOLO
+                    </li>
+                    <li>
+                        {% if system_status.onnx_available %}
+                            <i class="fas fa-check text-success"></i>
+                        {% else %}
+                            <i class="fas fa-exclamation-triangle text-warning"></i>
+                        {% endif %}
+                        ONNX 支持
+                    </li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-body">
+                <h6 class="card-title">使用提示</h6>
+                <ul class="small">
+                    <li>按顺序完成各模块配置</li>
+                    <li>确保数据集格式正确</li>
+                    <li>训练前检查GPU可用性</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
