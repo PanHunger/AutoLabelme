@@ -892,8 +892,8 @@ if __name__ == '__main__':
     print(f"本地访问: http://127.0.0.1:8001")
     print(f"局域网访问: http://{local_ip}:8001")
     print("\n使用说明:")
-    print("1. 需要搭配 AutoLabelme 使用")
-    print("2. 将 YOLO 模型文件夹放在 '../yolo_weights' 目录下")
+    print("1. 需要搭配 AutoLabelme 或 YOLO训练平台 使用")
+    print("2. 将 YOLO 模型文件夹放在 'AutoLabelme/yolo_weights' 目录下")
     print("3. 每个模型文件夹应包含 best.pt 和 args.yaml 文件")
     print("4. 通过网页界面选择模型并进行推理")
     
