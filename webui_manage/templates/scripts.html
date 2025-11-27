@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4"><i class="bi bi-file-earmark-code"></i> 脚本执行</h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">执行Python脚本</h5>
+            </div>
+            <div class="card-body">
+                <form id="scriptForm">
+                    <div class="mb-3">
+                        <label for="envSelect" class="form-label">选择虚拟环境</label>
+                        <select class="form-select" id="envSelect" required>
+                            <option value="">-- 请选择环境 --</option>
+                            <!-- 环境选项将通过JavaScript填充 -->
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="scriptPath" class="form-label">脚本路径</label>
+                        <input type="text" class="form-control" id="scriptPath" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="scriptArgs" class="form-label">脚本参数 (可选)</label>
+                        <input type="text" class="form-control" id="scriptArgs">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">或上传Python脚本</label>
+                        <input type="file" class="form-control" id="scriptUpload" accept=".py">
+                    </div>
+                    <button type="submit" class="btn btn-primary">执行脚本</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">执行输出</h5>
+            </div>
+            <div class="card-body">
+                <div id="outputContainer">
+                    <pre id="scriptOutput" class="bg-light p-3" style="min-height: 300px; max-height: 500px; overflow-y: auto;">
+等待执行脚本...
+                    </pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">快速执行</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <button class="btn btn-outline-primary w-100" id="sysInfoBtn">
+                            <i class="bi bi-info-circle"></i> 系统信息报告
+                        </button>
+                    </div>
+                    <div class="col-md-4">
+                        <button class="btn btn-outline-success w-100" id="diskSpaceBtn">
+                            <i class="bi bi-hdd"></i> 磁盘空间检查
+                        </button>
+                    </div>
+                    <div class="col-md-4">
+                        <button class="btn btn-outline-warning w-100" id="processListBtn">
+                            <i class="bi bi-list-task"></i> 进程列表
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // 脚本执行的JavaScript代码将在script.js中实现
+</script>
+{% endblock %}

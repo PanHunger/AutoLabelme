@@ -1,0 +1,9 @@
+{
+  "virtual_envs": {},
+  "scheduled_tasks": [],
+  "python_scripts": {},
+  "settings": {
+    "refresh_interval": 5,
+    "auto_refresh": true
+  }
+}
