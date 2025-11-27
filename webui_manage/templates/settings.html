@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4"><i class="bi bi-gear"></i> 系统设置</h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">监控设置</h5>
+            </div>
+            <div class="card-body">
+                <form id="monitorSettingsForm">
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="autoRefreshSetting">
+                            <label class="form-check-label" for="autoRefreshSetting">自动刷新监控数据</label>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="refreshIntervalSetting" class="form-label">刷新间隔 (秒)</label>
+                        <select class="form-select" id="refreshIntervalSetting">
+                            <option value="1">1秒</option>
+                            <option value="3">3秒</option>
+                            <option value="5">5秒</option>
+                            <option value="10">10秒</option>
+                            <option value="30">30秒</option>
+                            <option value="60">60秒</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="dataRetention" class="form-label">数据保留天数</label>
+                        <input type="number" class="form-control" id="dataRetention" min="1" max="365" value="30">
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">保存监控设置</button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">通知设置</h5>
+            </div>
+            <div class="card-body">
+                <form id="notificationSettingsForm">
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="emailNotifications">
+                            <label class="form-check-label" for="emailNotifications">启用邮件通知</label>
+                        </div>
+                    </div>
+                    
+                    <div id="emailSettings" style="display: none;">
+                        <div class="mb-3">
+                            <label for="smtpServer" class="form-label">SMTP服务器</label>
+                            <input type="text" class="form-control" id="smtpServer" placeholder="smtp.example.com">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="smtpPort" class="form-label">SMTP端口</label>
+                            <input type="number" class="form-control" id="smtpPort" value="587">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="emailAddress" class="form-label">发件人邮箱</label>
+                            <input type="email" class="form-control" id="emailAddress" placeholder="user@example.com">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="emailPassword" class="form-label">邮箱密码/授权码</label>
+                            <input type="password" class="form-control" id="emailPassword">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="recipientEmail" class="form-label">接收通知邮箱</label>
+                            <input type="email" class="form-control" id="recipientEmail" placeholder="admin@example.com">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="slackNotifications">
+                            <label class="form-check-label" for="slackNotifications">启用Slack通知</label>
+                        </div>
+                    </div>
+                    
+                    <div id="slackSettings" style="display: none;">
+                        <div class="mb-3">
+                            <label for="slackWebhook" class="form-label">Slack Webhook URL</label>
+                            <input type="text" class="form-control" id="slackWebhook" placeholder="https://hooks.slack.com/services/...">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="slackChannel" class="form-label">Slack频道</label>
+                            <input type="text" class="form-control" id="slackChannel" placeholder="#server-alerts">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6>告警阈值设置</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="cpuThreshold" class="form-label">CPU使用率阈值 (%)</label>
+                                <input type="number" class="form-control" id="cpuThreshold" min="1" max="100" value="90">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="memoryThreshold" class="form-label">内存使用率阈值 (%)</label>
+                                <input type="number" class="form-control" id="memoryThreshold" min="1" max="100" value="90">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">保存通知设置</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">备份设置</h5>
+            </div>
+            <div class="card-body">
+                <form id="backupSettingsForm">
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="autoBackup">
+                            <label class="form-check-label" for="autoBackup">启用自动备份</label>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="backupSchedule" class="form-label">备份计划</label>
+                        <select class="form-select" id="backupSchedule">
+                            <option value="daily">每日</option>
+                            <option value="weekly">每周</option>
+                            <option value="monthly">每月</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="backupRetention" class="form-label">备份保留天数</label>
+                        <input type="number" class="form-control" id="backupRetention" min="1" max="365" value="30">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="backupPath" class="form-label">备份存储路径</label>
+                        <input type="text" class="form-control" id="backupPath" placeholder="/path/to/backup">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <button type="button" class="btn btn-outline-primary" id="backupNowBtn">
+                            <i class="bi bi-download"></i> 立即备份
+                        </button>
+                        <button type="submit" class="btn btn-primary">保存备份设置</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">系统操作</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-warning" id="clearLogsBtn">
+                        <i class="bi bi-trash"></i> 清理系统日志
+                    </button>
+                    
+                    <button class="btn btn-outline-info" id="exportConfigBtn">
+                        <i class="bi bi-download"></i> 导出配置
+                    </button>
+                    
+                    <button class="btn btn-outline-secondary" id="importConfigBtn">
+                        <i class="bi bi-upload"></i> 导入配置
+                    </button>
+                    
+                    <button class="btn btn-outline-danger" id="resetSettingsBtn">
+                        <i class="bi bi-arrow-counterclockwise"></i> 重置设置为默认
+                    </button>
+                </div>
+                
+                <div class="mt-4">
+                    <h6>系统信息</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <small class="text-muted">配置文件路径:</small>
+                            <p id="configPath">config.json</p>
+                        </div>
+                        <div class="col-md-6">
+                            <small class="text-muted">最后备份时间:</small>
+                            <p id="lastBackupTime">从未备份</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">关于</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>服务器监控平台</strong></p>
+                <p>版本: 1.0.0</p>
+                <p>作者: Your Name</p>
+                <p>描述: 基于Flask的服务器监控和环境管理平台</p>
+                
+                <div class="mt-3">
+                    <h6>系统依赖</h6>
+                    <ul class="list-unstyled">
+                        <li>Flask - Web框架</li>
+                        <li>psutil - 系统监控</li>
+                        <li>gpustat - GPU监控</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 配置导入模态框 -->
+<div class="modal fade" id="importConfigModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">导入配置</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="configFile" class="form-label">选择配置文件</label>
+                    <input type="file" class="form-control" id="configFile" accept=".json">
+                </div>
+                <div class="form-text">请选择之前导出的配置文件 (.json)</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" id="confirmImportBtn">导入</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        initSettings();
+    });
+</script>
+{% endblock %}
