@@ -93,7 +93,7 @@ def safe_load_yaml(file_path):
 
 class YOLOModelManager:
     def __init__(self):
-        self.models_base_path = 'yolo_weights'
+        self.models_base_path = '../yolo_weights'
         self.current_model = None
         self.model_instance = None
         
@@ -775,7 +775,7 @@ def serve_model_file(filename):
         if '..' in safe_path or safe_path.startswith('/'):
             return jsonify({'error': '无效的文件路径'}), 400
             
-        file_path = os.path.join('yolo_weights', safe_path)
+        file_path = os.path.join('../yolo_weights', safe_path)
         if os.path.exists(file_path) and os.path.isfile(file_path):
             # 根据文件类型设置MIME类型
             ext = os.path.splitext(file_path)[1].lower()
@@ -893,7 +893,7 @@ if __name__ == '__main__':
     print(f"局域网访问: http://{local_ip}:8001")
     print("\n使用说明:")
     print("1. 需要搭配 AutoLabelme 使用")
-    print("2. 将 YOLO 模型文件夹放在 'yolo_weights' 目录下")
+    print("2. 将 YOLO 模型文件夹放在 '../yolo_weights' 目录下")
     print("3. 每个模型文件夹应包含 best.pt 和 args.yaml 文件")
     print("4. 通过网页界面选择模型并进行推理")
     
